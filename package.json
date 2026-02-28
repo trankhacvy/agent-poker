@@ -1,0 +1,38 @@
+{
+  "name": "agent-poker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@repo/web",
+    "dev:api": "turbo run dev --filter=@repo/game-server",
+    "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "anchor:test": "anchor test",
+    "anchor:build": "anchor build"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.3.20",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.3.1",
+    "mocha": "^10.8.2",
+    "prettier": "^3.0.0",
+    "ts-node": "^10.9.2",
+    "turbo": "^2.0.0"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
+    "@solana/web3.js": "^1.98.4",
+    "bn.js": "^5.2.3",
+    "chai": "^4.5.0",
+    "ts-mocha": "^11.1.0"
+  },
+  "pnpm": {
+    "overrides": {}
+  },
+  "packageManager": "pnpm@10.15.0"
+}

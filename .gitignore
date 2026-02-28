@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+target/
+dist/
+.next/
+out/
+
+# Anchor
+.anchor/
+programs/**/target/
+test-ledger/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Turborepo
+.turbo/
+
+# Vercel
+.vercel/
+
+# Keys / secrets
+*.pem
+keypair.json
+*-keypair.json
+.keys
+
+# Claude Code
+.claude/projects/
+.claude/todos/
+
+# Skills
+.agents/
+.claude/skills/
+.agent/
+skills-lock.json
+skills/
