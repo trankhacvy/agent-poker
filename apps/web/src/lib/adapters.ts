@@ -238,12 +238,14 @@ export interface AdaptedWsMessage {
     | "betting_countdown"
     | "betting_locked"
     | "pool_update"
+    | "next_game_countdown"
     | "subscribe_ack"
     | "error";
   gameState?: GameStateSnapshot;
   action?: GameAction;
   table?: TableInfo;
   bettingCountdown?: { tableId: string; secondsRemaining: number };
+  nextGameCountdown?: number;
   poolData?: { totalPool: number; agentPools: Record<string, number> };
   gameId?: string;
   tableId?: string;
@@ -262,8 +264,6 @@ export function adaptWsMessage(raw: BackendWsMessage): AdaptedWsMessage {
     case "game_state": {
       const data = raw.data as BackendGameState;
       result.gameState = adaptGameState(data);
-      const action = adaptLastAction(data);
-      if (action) result.action = action;
       break;
     }
     case "game_action": {
@@ -315,6 +315,11 @@ export function adaptWsMessage(raw: BackendWsMessage): AdaptedWsMessage {
         totalPool: lamportsToSol(data.totalPool),
         agentPools: convertedPools,
       };
+      break;
+    }
+    case "next_game_countdown": {
+      const data = raw.data as { secondsRemaining: number };
+      result.nextGameCountdown = data.secondsRemaining;
       break;
     }
     case "subscribe_ack":

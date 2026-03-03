@@ -1,6 +1,7 @@
+import fp from "fastify-plugin";
 import type { FastifyInstance } from "fastify";
 import type WebSocket from "ws";
-import type { WsMessage } from "./types.js";
+import type { WsMessage } from "../types.js";
 
 interface ClientSubscription {
   socket: WebSocket;
@@ -22,8 +23,11 @@ export class WsFeed {
 
       socket.on("message", (raw: WebSocket.Data) => {
         try {
-          const msg: { type: string; gameId?: string; tableId?: string } =
-            JSON.parse(raw.toString());
+          const msg: {
+            type: string;
+            gameId?: string;
+            tableId?: string;
+          } = JSON.parse(raw.toString());
 
           if (msg.type === "subscribe") {
             if (msg.gameId) subscription.gameIds.add(msg.gameId);
@@ -38,10 +42,14 @@ export class WsFeed {
               })
             );
           } else if (msg.type === "unsubscribe") {
-            if (msg.gameId) subscription.gameIds.delete(msg.gameId);
-            if (msg.tableId) subscription.tableIds.delete(msg.tableId);
+            if (msg.gameId)
+              subscription.gameIds.delete(msg.gameId);
+            if (msg.tableId)
+              subscription.tableIds.delete(msg.tableId);
           }
-        } catch {}
+        } catch {
+          // ignore malformed messages
+        }
       });
 
       socket.on("close", () => {
@@ -77,3 +85,19 @@ export class WsFeed {
     }
   }
 }
+
+declare module "fastify" {
+  interface FastifyInstance {
+    wsFeed: WsFeed;
+  }
+}
+
+export default fp(
+  async (fastify: FastifyInstance) => {
+    const feed = new WsFeed();
+    fastify.decorate("wsFeed", feed);
+    feed.registerRoutes(fastify);
+    fastify.log.info("WebSocket feed plugin loaded");
+  },
+  { name: "websocket-feed" }
+);

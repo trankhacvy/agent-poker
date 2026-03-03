@@ -43,7 +43,7 @@ export default function ActionFeed({ actions }: ActionFeedProps) {
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      scrollRef.current.scrollTop = 0;
     }
   }, [actions]);
 
@@ -60,7 +60,7 @@ export default function ActionFeed({ actions }: ActionFeedProps) {
                 Waiting for actions...
               </p>
             )}
-            {actions.map((action) => (
+            {actions.slice().reverse().map((action) => (
               <div
                 key={action.id}
                 className={`text-sm ${actionColors[action.actionType] ?? "text-muted-foreground"}`}

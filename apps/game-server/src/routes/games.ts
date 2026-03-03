@@ -1,45 +1,46 @@
 import { Type } from "@sinclair/typebox";
 import type { FastifyInstance } from "fastify";
 import type { TypeBoxTypeProvider } from "@fastify/type-provider-typebox";
-import { AgentSchema, PubkeyParamsSchema, PaginationQuerySchema, ErrorResponseSchema } from "../schemas/index.js";
+import {
+  GameHistoryRecordSchema,
+  PubkeyParamsSchema,
+  PaginationQuerySchema,
+} from "../schemas/index.js";
 
-export default async function agentRoutes(
+export default async function gameRoutes(
   fastify: FastifyInstance
 ): Promise<void> {
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
-  app.get(
-    "/agents/:pubkey",
+  fastify.get<{ Params: { gameId: string } }>(
+    "/games/:gameId",
     {
       schema: {
-        params: PubkeyParamsSchema,
-        response: {
-          200: AgentSchema,
-          404: ErrorResponseSchema,
-        },
+        params: Type.Object({ gameId: Type.String() }),
       },
     },
     async (request, reply) => {
-      const agent = await fastify.solanaRead.getAgent(
-        request.params.pubkey
+      const state = fastify.orchestrator.getGameState(
+        request.params.gameId
       );
-      if (!agent) {
+      if (!state) {
         return reply
           .status(404)
-          .send({ statusCode: 404, message: "Agent not found" });
+          .send({ statusCode: 404, message: "Game not found" });
       }
-      return agent;
+      return state;
     }
   );
 
   app.get(
-    "/agents",
+    "/games/agent/:pubkey",
     {
       schema: {
+        params: PubkeyParamsSchema,
         querystring: PaginationQuerySchema,
         response: {
           200: Type.Object({
-            agents: Type.Array(AgentSchema),
+            games: Type.Array(GameHistoryRecordSchema),
             total: Type.Number(),
           }),
         },
@@ -48,7 +49,11 @@ export default async function agentRoutes(
     async (request) => {
       const offset = request.query.offset ?? 0;
       const limit = request.query.limit ?? 20;
-      return fastify.solanaRead.getAllAgents(offset, limit);
+      return fastify.solanaRead.getCompletedGames(
+        request.params.pubkey,
+        offset,
+        limit
+      );
     }
   );
 }

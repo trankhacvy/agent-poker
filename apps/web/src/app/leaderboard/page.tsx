@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { AgentData } from "@/lib/types";
 import { TEMPLATES } from "@/lib/constants";
-import { fetchLeaderboard } from "@/lib/api";
+import { useLeaderboard } from "@/hooks/queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -21,11 +21,7 @@ type SortKey = "wins" | "gamesPlayed";
 
 export default function LeaderboardPage() {
   const [sortKey, setSortKey] = useState<SortKey>("wins");
-  const [entries, setEntries] = useState<AgentData[]>([]);
-
-  useEffect(() => {
-    fetchLeaderboard().then(setEntries);
-  }, []);
+  const { data: entries = [] } = useLeaderboard();
 
   const sorted = [...entries].sort((a, b) => b[sortKey] - a[sortKey]);
 

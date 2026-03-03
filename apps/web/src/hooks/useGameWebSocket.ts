@@ -17,6 +17,8 @@ interface UseGameWebSocketReturn {
   bettingLocked: boolean;
   isConnected: boolean;
   poolData: PoolData | null;
+  nextGameCountdown: number | null;
+  gameEnded: boolean;
   subscribe: (tableId: string) => void;
   unsubscribe: (tableId: string) => void;
 }
@@ -28,6 +30,8 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
   const [bettingLocked, setBettingLocked] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [poolData, setPoolData] = useState<PoolData | null>(null);
+  const [nextGameCountdown, setNextGameCountdown] = useState<number | null>(null);
+  const [gameEnded, setGameEnded] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subscribedTableRef = useRef<string | null>(null);
@@ -49,14 +53,10 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
       console.log("[WS] Connected!");
       setIsConnected(true);
       if (subscribedTableRef.current) {
-        ws.send(
-          JSON.stringify({ type: "subscribe", tableId: subscribedTableRef.current })
-        );
+        ws.send(JSON.stringify({ type: "subscribe", tableId: subscribedTableRef.current }));
       }
       if (subscribedGameRef.current) {
-        ws.send(
-          JSON.stringify({ type: "subscribe", gameId: subscribedGameRef.current })
-        );
+        ws.send(JSON.stringify({ type: "subscribe", gameId: subscribedGameRef.current }));
       }
     };
 
@@ -75,15 +75,31 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
             if (msg.action) {
               setActions((prev) => [...prev.slice(-99), msg.action!]);
             }
-            if (msg.type === "game_start" && msg.gameId && msg.gameId !== subscribedGameRef.current) {
-              subscribedGameRef.current = msg.gameId;
-              ws.send(JSON.stringify({ type: "subscribe", gameId: msg.gameId }));
+            if (msg.type === "game_start") {
+              setGameEnded(false);
+              setNextGameCountdown(null);
+              if (msg.gameId && msg.gameId !== subscribedGameRef.current) {
+                subscribedGameRef.current = msg.gameId;
+                ws.send(JSON.stringify({ type: "subscribe", gameId: msg.gameId }));
+              }
             }
             break;
           }
           case "game_end": {
             if (msg.gameState) {
               setGameState(msg.gameState);
+            }
+            setGameEnded(true);
+            break;
+          }
+          case "next_game_countdown": {
+            if (msg.nextGameCountdown != null) {
+              setNextGameCountdown(msg.nextGameCountdown);
+              if (msg.nextGameCountdown <= 0) {
+                setGameEnded(false);
+                setGameState(null);
+                setActions([]);
+              }
             }
             break;
           }
@@ -142,6 +158,8 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
       setBettingCountdown(null);
       setBettingLocked(false);
       setPoolData(null);
+      setNextGameCountdown(null);
+      setGameEnded(false);
       sendJson({ type: "subscribe", tableId });
     },
     [sendJson]
@@ -158,7 +176,6 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
     },
     [sendJson]
   );
-
   return {
     gameState,
     actions,
@@ -166,6 +183,8 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
     bettingLocked,
     isConnected,
     poolData,
+    nextGameCountdown,
+    gameEnded,
     subscribe,
     unsubscribe,
   };

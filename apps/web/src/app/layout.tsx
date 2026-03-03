@@ -3,6 +3,7 @@ import { Poppins } from "next/font/google";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 import WalletProvider from "@/components/layout/WalletProvider";
+import QueryProvider from "@/components/layout/QueryProvider";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,11 +28,13 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={`${poppins.variable}`}>
         <WalletProvider>
-          <TooltipProvider>
-            <Navbar />
-            <main className="pt-16">{children}</main>
-            <Footer />
-          </TooltipProvider>
+          <QueryProvider>
+            <TooltipProvider>
+              <Navbar />
+              <main className="pt-16">{children}</main>
+              <Footer />
+            </TooltipProvider>
+          </QueryProvider>
         </WalletProvider>
       </body>
     </html>

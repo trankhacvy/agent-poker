@@ -4,7 +4,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        SOLANA L1 (Mainnet)                         │
+│                        SOLANA L1 (Devnet)                           │
 │                                                                     │
 │  ┌──────────────┐  ┌──────────────┐  ┌───────────────────────────┐ │
 │  │ Agent Program │  │ Wager Escrow │  │ Spectator Betting Program │ │
@@ -42,27 +42,26 @@
                              │
               ┌──────────────┴──────────────┐
               │     Game Server (Fastify)    │
-              │      (Off-chain)            │
+              │     Plugin Architecture     │
               │                              │
               │  ┌────────────────────────┐  │
-              │  │  Turn Orchestrator     │  │
+              │  │  Orchestrator Plugin   │  │
               │  │  - Read game state     │  │
               │  │  - Feed to LLM         │  │
               │  │  - Submit action tx    │  │
               │  └────────────────────────┘  │
               │                              │
               │  ┌────────────────────────┐  │
-              │  │  LLM Gateway          │  │
+              │  │  LLM Plugin           │  │
               │  │  - Template → prompt   │  │
-              │  │  - Claude Haiku /      │  │
-              │  │    GPT-4o-mini         │  │
+              │  │  - Gemini 2.5 Flash / │  │
+              │  │    Llama 3.3 70B      │  │
               │  └────────────────────────┘  │
               │                              │
               │  ┌────────────────────────┐  │
-              │  ┌────────────────────────┐  │
-              │  │  WS Feed (@fastify/ws) │  │
+              │  │  WS Feed Plugin       │  │
               │  │  - Public game state   │  │
-              │  │  - Agent reasoning     │  │
+              │  │  - Betting updates     │  │
               │  └────────────────────────┘  │
               └──────────────────────────────┘
                              │
@@ -107,6 +106,10 @@ Instructions:
 ├── fund_agent(amount)
 │   → Transfer SOL from owner → agent wallet PDA
 │
+├── update_stats(games_delta, wins_delta, earnings_delta)
+│   → Called by game authority after each game
+│   → Updates total_games, total_wins, total_earnings
+│
 └── withdraw(amount)
     → Transfer SOL from agent wallet PDA → owner
     → Only owner can call
@@ -119,7 +122,7 @@ Handles table buy-ins and payouts.
 ```
 Account: TableEscrow (PDA: [b"table", table_id])
 ├── table_id: u64
-├── wager_tier: u64            // lamports per seat (e.g., 1 SOL)
+├── wager_tier: u64            // lamports per seat (e.g., 0.1 SOL)
 ├── players: [Pubkey; 6]       // agent pubkeys (0 = empty seat)
 ├── player_count: u8
 ├── status: enum { Open, Full, InProgress, Settled }
@@ -128,6 +131,9 @@ Account: TableEscrow (PDA: [b"table", table_id])
 └── bump: u8
 
 Instructions:
+├── initialize_treasury()
+│   → Creates platform treasury PDA
+│
 ├── create_table(wager_tier)
 │   → Platform authority creates table
 │   → Sets wager amount
@@ -135,7 +141,10 @@ Instructions:
 ├── join_table(agent_pubkey)
 │   → Transfer wager from agent wallet → escrow PDA
 │   → Add to players array
-│   → If player_count == 6 → status = Full, trigger game start
+│   → If player_count == 6 → status = Full
+│
+├── start_game()
+│   → Transitions table to InProgress
 │
 ├── settle_table(winner_pubkey)
 │   → Only callable by game_authority (game server signer)
@@ -154,15 +163,16 @@ Instructions:
 Account: BettingPool (PDA: [b"bet_pool", table_id])
 ├── table_id: u64
 ├── total_pool: u64            // total SOL bet by spectators
-├── bets: Vec<Bet>             // max ~50 bets per pool (MVP)
 ├── status: enum { Open, Locked, Settled }
 ├── winner: Option<Pubkey>     // winning agent
 └── bump: u8
 
-Struct: Bet
-├── bettor: Pubkey             // spectator wallet
-├── agent: Pubkey              // agent they bet on
-└── amount: u64                // lamports
+Account: BetAccount (PDA: [b"bet", pool, bettor])
+├── pool: Pubkey
+├── bettor: Pubkey
+├── agent: Pubkey
+├── amount: u64
+└── bump: u8
 
 Instructions:
 ├── create_pool(table_id)
@@ -171,14 +181,15 @@ Instructions:
 ├── place_bet(agent_pubkey, amount)
 │   → Transfer SOL from bettor → pool PDA
 │   → Only while status == Open
-│   → Locks when game starts
+│
+├── lock_pool()
+│   → Locks betting when game starts
 │
 ├── settle_pool(winner_pubkey)
 │   → Game authority calls after game ends
 │   → Calculate each winning bettor's share (pro-rata)
 │   → 95% of pool → winning bettors
 │   → 5% → platform treasury
-│   → Each winner can claim via separate tx
 │
 └── claim_winnings()
     → Bettor calls to withdraw their share
@@ -189,57 +200,67 @@ Instructions:
 ## 3. Poker Game Program (Runs on MagicBlock PER)
 
 This is the core game logic. It runs inside a **Private Ephemeral Rollup** (TEE) so
-player hands remain hidden until showdown.
+player hands remain hidden until showdown. The program is annotated with `#[ephemeral]`.
 
 ### 3.1 State Accounts
 
 ```
-Account: GameState (PDA: [b"game", table_id])  — DELEGATED TO PER
+Account: GameState (PDA: [b"poker_game", game_id (u64 LE)])  — DELEGATED TO PER
+├── game_id: u64
 ├── table_id: u64
-├── phase: enum { Preflop, Flop, Turn, River, Showdown, Finished }
+├── wager_tier: u64
+├── phase: enum { Waiting, Preflop, Flop, Turn, River, Showdown, Complete }
 ├── deck: [u8; 52]            // shuffled deck (PRIVATE — only TEE can read)
 ├── community_cards: [u8; 5]  // revealed progressively
+├── community_count: u8
 ├── pot: u64                   // current pot in lamports
 ├── current_bet: u64           // current bet to call
 ├── dealer_index: u8           // button position
-├── active_player: u8          // whose turn (0-5)
-├── round_actions: u8          // actions taken this round
-├── players: [PlayerState; 6]
+├── current_player: u8         // whose turn (0-5)
+├── player_count: u8
+├── players: [Pubkey; 6]
+├── player_status: [u8; 6]    // 0=empty, 1=active, 2=folded, 3=all_in
+├── player_bets: [u64; 6]
+├── winner_index: u8
+├── last_action_at: i64
 └── bump: u8
 
-Struct: PlayerState
-├── agent: Pubkey
-├── chips: u64                 // starting chips = wager amount
-├── hand: [u8; 2]             // PRIVATE — only visible to that agent's authorized key
-├── current_round_bet: u64
-├── status: enum { Active, Folded, AllIn, Eliminated }
-└── last_action: enum { None, Fold, Check, Call, Raise(u64), AllIn }
-
-Account: PlayerHand (PDA: [b"hand", table_id, player_index])  — PERMISSIONED
-├── cards: [u8; 2]            // private hole cards
+Account: PlayerHand (PDA: [b"player_hand", game_id (u64 LE), seat_index])  — PERMISSIONED
+├── game_id: u64
+├── seat_index: u8
+├── hand: [u8; 2]             // private hole cards
 └── bump: u8
-// Permission: only the agent's authorized signer can read this account
+// Permission: only the game authority can read during play
 ```
 
 ### 3.2 Instructions
 
 ```
-initialize_game(table_id, players: [Pubkey; 6])
-    → Create GameState, set phase = Preflop
-    → Request VRF for deck shuffle
+create_game(game_id, table_id, wager_tier)
+    → Create GameState + 6 PlayerHand accounts
+    → Set phase = Waiting
+
+join_game(game_id, seat_index, player_pubkey)
+    → Register player at seat
+    → Delegate PlayerHand to PER with permissions
+
+delegate_pda(pda_type)
+    → Delegate empty PlayerHand PDAs to PER for unused seats
+
+start_game(game_id)
+    → Delegate GameState to PER
+    → Ready for VRF shuffle
+
+request_shuffle(game_id)
     → CPI to MagicBlock VRF program
+    → On callback: Fisher-Yates shuffle, deal 2 cards per player
+    → Advance phase: Waiting → Preflop
+    → Post blinds automatically
 
-vrf_callback(randomness: [u8; 32])
-    → Shuffle deck using Fisher-Yates with VRF seed
-    → Deal 2 cards to each player → write to PlayerHand accounts
-    → Set permissions: each PlayerHand readable only by corresponding agent signer
-    → Set active_player = left of dealer
-
-player_action(player_index, action: PokerAction)
+player_action(action, raise_amount)
     → Validate it's this player's turn
-    → Validate action is legal given game state
-    → Apply action (fold/check/call/raise/all-in)
-    → Update pot, current_bet, player chips
+    → action: 0=fold, 1=check, 2=call, 3=raise, 4=all_in
+    → Apply action, update pot/bets/status
     → Advance to next active player
     → If round complete → advance phase:
         Preflop → Flop (reveal 3 community cards)
@@ -247,21 +268,14 @@ player_action(player_index, action: PokerAction)
         Turn → River (reveal 1 community card)
         River → Showdown
 
-showdown()
+showdown_test()
     → Evaluate all remaining players' hands + community cards
     → Determine winner (standard poker hand ranking)
-    → Update permissions: all PlayerHand accounts become public
-    → Record winner in GameState
-    → phase = Finished
-    → Emit event for settlement
+    → Record winner_index in GameState
 
-enum PokerAction {
-    Fold,
-    Check,
-    Call,
-    Raise(u64),
-    AllIn,
-}
+commit_game()
+    → Undelegate GameState from PER back to L1
+    → Phase = Complete after settling on base layer
 ```
 
 ### 3.3 Privacy Model (MagicBlock PER)
@@ -269,15 +283,16 @@ enum PokerAction {
 ```
 Delegation flow:
 
-1. Table fills (6 players) on L1
-2. Game server delegates GameState + 6 PlayerHand accounts to PER (TEE node)
-3. PER creates permissions:
-   - GameState: readable by game server (for public state broadcast)
-   - PlayerHand[i]: readable ONLY by agent[i]'s authorized signer
-4. Game plays out inside PER
-5. On showdown: permissions updated, all hands become public
-6. GameState undelegated back to L1
-7. Settlement executes on L1
+1. Game server creates game + player hand accounts on L1
+2. Players join → each PlayerHand delegated to PER during join_game
+3. Empty seat PlayerHands delegated via delegate_pda
+4. GameState delegated to PER via start_game
+5. PER permissions:
+   - GameState: readable by game server authority
+   - PlayerHand[i]: readable by game authority (for LLM input)
+6. Game plays out inside PER
+7. On commit_game: GameState undelegated back to L1
+8. Settlement + stats updates execute on L1
 ```
 
 ### 3.4 Card Dealing (MagicBlock VRF)
@@ -308,172 +323,319 @@ Deal:
 The game server is the orchestrator. It does NOT make game decisions — it feeds state
 to LLMs and submits their decisions as transactions.
 
-### 4.1 Components
+### 4.1 Plugin Architecture
+
+The server uses **Fastify** with a plugin-based architecture. Each service is a
+`fastify-plugin` that decorates the Fastify instance with its class. Plugins are
+registered in dependency order and accessible via `fastify.<name>`.
 
 ```
-game-server/
-├── src/
-│   ├── orchestrator.ts        // main game loop
-│   ├── llm-gateway.ts         // LLM API calls
-│   ├── templates/             // agent personality prompts
-│   │   ├── shark.txt
-│   │   ├── maniac.txt
-│   │   ├── rock.txt
-│   │   └── fox.txt
-│   ├── solana-client.ts       // interact with on-chain programs
-│   ├── ws-feed.ts             // @fastify/websocket spectator feed
-│   └── matchmaker.ts          // table creation and filling
+apps/game-server/src/
+├── plugins/
+│   ├── env.ts                  # Zod env validation → fastify.env
+│   ├── error-handler.ts        # Centralized error formatting
+│   ├── game-tracker.ts         # Active game counter → fastify.gameTracker
+│   ├── solana-read.ts          # OnChainReader class → fastify.solanaRead
+│   ├── solana-write.ts         # SolanaClient class → fastify.solanaWrite
+│   ├── llm.ts                  # LlmGateway class → fastify.llm
+│   ├── websocket-feed.ts       # WsFeed class → fastify.wsFeed
+│   ├── matchmaker.ts           # Matchmaker class → fastify.matchmaker
+│   ├── orchestrator.ts         # Orchestrator class → fastify.orchestrator
+│   ├── auto-queue.ts           # AutoQueue class → fastify.autoQueue
+│   ├── game-lifecycle.ts       # Event wiring (bettingLocked, queueTimeout)
+│   └── index.ts                # Registers all plugins in dependency order
+├── routes/
+│   ├── agents.ts               # GET /api/agents, GET /api/agents/:pubkey
+│   ├── games.ts                # GET /api/games/:gameId, GET /api/games/agent/:pubkey
+│   ├── leaderboard.ts          # GET /api/leaderboard
+│   ├── queue.ts                # POST /api/queue/join
+│   ├── tables.ts               # GET /api/tables, GET /api/tables/:tableId, betting
+│   ├── stats.ts                # GET /api/stats
+│   └── index.ts                # Barrel, all under /api prefix
+├── schemas/
+│   ├── agent.ts                # AgentSchema (TypeBox)
+│   ├── game.ts                 # GameHistory schemas
+│   ├── table.ts                # Table/Player schemas
+│   ├── pagination.ts           # PaginationQuery, PubkeyParams
+│   ├── errors.ts               # ErrorResponse schema
+│   └── index.ts                # Barrel
+├── lib/
+│   ├── hand-evaluator.ts       # evaluateHand() for LLM context
+│   └── templates.ts            # 4 agent personality templates
+├── types.ts                    # Core TS interfaces
+├── app.ts                      # buildApp() factory (testable)
+└── server.ts                   # Slim: import dotenv, buildApp(), listen
 ```
 
-### 4.2 Turn Orchestrator Loop
+#### Plugin Registration Order
 
 ```
-async function runGame(tableId):
-    // 1. Delegate state to PER
-    await delegateToPER(tableId)
-
-    // 2. Initialize game on PER (triggers VRF + deal)
-    await initializeGame(tableId, players)
-
-    // 3. Game loop
-    while gameState.phase != Finished:
-        activePlayer = gameState.players[gameState.active_player]
-
-        // 4. Read visible state for this agent
-        visibleState = {
-            community_cards: gameState.community_cards,
-            pot: gameState.pot,
-            current_bet: gameState.current_bet,
-            my_hand: readPlayerHand(activePlayer),  // PER permissioned read
-            my_chips: activePlayer.chips,
-            opponents: gameState.players.map(p => ({
-                status: p.status,
-                chips: p.chips,
-                last_action: p.last_action,
-                current_round_bet: p.current_round_bet,
-                // NOTE: no hand — private!
-            })),
-            phase: gameState.phase,
-        }
-
-        // 5. Get LLM decision
-        action = await getLLMAction(activePlayer.template, visibleState)
-
-        // 6. Submit action to PER
-        await submitPlayerAction(tableId, gameState.active_player, action)
-
-        // 7. Broadcast to spectators (public state only)
-        broadcastToSpectators(tableId, {
-            phase: gameState.phase,
-            pot: gameState.pot,
-            community_cards: gameState.community_cards,
-            active_player: gameState.active_player,
-            players: sanitizedPlayerStates,  // no hands until showdown
-            last_action: { player: activePlayer.display_name, action },
-            reasoning: action.reasoning,  // LLM's explanation (optional)
-        })
-
-        // 8. Small delay for spectator experience
-        await sleep(2000)  // 2 seconds between actions
-
-    // 9. Showdown — reveal all hands
-    broadcastShowdown(tableId, allHands)
-
-    // 10. Undelegate from PER back to L1
-    await undelegateFromPER(tableId)
-
-    // 11. Settle on L1
-    await settleTable(tableId, winner)
-    await settleBettingPool(tableId, winner)
+1. @fastify/cors
+2. @fastify/websocket
+3. env             (Zod-validates process.env)
+4. error-handler   (centralized error formatting)
+5. game-tracker    (active game counter)
+6. solana-read     (depends on: env)
+7. solana-write    (depends on: env)
+8. llm             (depends on: env)
+9. websocket-feed  (registers /ws route)
+10. matchmaker     (depends on: websocket-feed)
+11. orchestrator   (depends on: solana-write, llm, websocket-feed)
+12. auto-queue     (depends on: matchmaker, solana-read, env)
+13. game-lifecycle (depends on: all of the above)
 ```
 
-### 4.3 LLM Gateway
+#### Fastify Decorators
 
-```
-async function getLLMAction(template, visibleState):
-    systemPrompt = loadTemplate(template)  // e.g., shark.txt
-
-    userPrompt = `
-        Game Phase: ${visibleState.phase}
-        Your Hand: ${formatCards(visibleState.my_hand)}
-        Community Cards: ${formatCards(visibleState.community_cards)}
-        Pot: ${visibleState.pot}
-        Current Bet to Call: ${visibleState.current_bet}
-        Your Chips: ${visibleState.my_chips}
-        Your Current Bet This Round: ${visibleState.my_current_bet}
-
-        Opponents:
-        ${visibleState.opponents.map(formatOpponent).join('\n')}
-
-        Legal actions: ${getLegalActions(visibleState)}
-
-        Respond with JSON: { "action": "fold|check|call|raise|allin", "raise_amount": number|null, "reasoning": "brief explanation" }
-    `
-
-    response = await llm.chat({
-        model: "claude-haiku-4-5-20251001",  // fast + cheap
-        system: systemPrompt,
-        user: userPrompt,
-        max_tokens: 200,
-    })
-
-    return parseAction(response)
+```typescript
+declare module "fastify" {
+  interface FastifyInstance {
+    env: Env;                   // Zod-validated environment
+    solanaRead: OnChainReader;  // Read-only on-chain queries (@solana/kit v2)
+    solanaWrite: SolanaClient;  // On-chain transactions (@solana/web3.js v1 + Anchor)
+    llm: LlmGateway;           // LLM provider abstraction
+    wsFeed: WsFeed;             // WebSocket broadcast
+    matchmaker: Matchmaker;     // Queue + betting windows
+    orchestrator: Orchestrator; // Game execution loop
+    autoQueue: AutoQueue;       // Automatic agent pairing
+    gameTracker: GameTracker;   // Active game count
+  }
+}
 ```
 
-### 4.4 Agent Templates (System Prompts)
+### 4.2 Environment Configuration
 
-**Shark (shark.txt)**
-```
-You are a tight-aggressive poker player. You only play strong starting hands
-(top 20%). When you do play, you bet and raise aggressively. You rarely call —
-you either raise or fold. You look for spots to put maximum pressure on opponents.
-You are patient and disciplined. You occasionally bluff in good spots (when the
-board favors your perceived range), but mostly play straightforward value poker.
-```
-
-**Maniac (maniac.txt)**
-```
-You are a loose-aggressive poker player. You play a wide range of hands and
-apply constant pressure through raises and re-raises. You bluff frequently —
-roughly 40% of your bets are bluffs. You love to make big bets to force
-opponents to make difficult decisions. You are unpredictable and creative.
-You sometimes make unconventional plays to confuse opponents.
-```
-
-**Rock (rock.txt)**
-```
-You are an ultra-conservative poker player. You only play premium hands
-(top 10%): AA, KK, QQ, JJ, AKs, AKo. You fold everything else preflop.
-When you do play, you bet for value. You rarely bluff (less than 5% of bets).
-You are extremely patient and wait for strong spots. You minimize losses
-by avoiding marginal situations.
-```
-
-**Fox (fox.txt)**
-```
-You are an adaptive poker player. You start tight and observe opponent patterns.
-As the game progresses, you exploit tendencies you detect:
-- Against tight players: steal more pots with well-timed bluffs
-- Against loose players: tighten up and value bet more
-- Against aggressive players: trap with slow-plays
-You adjust your strategy every few hands based on what you've seen.
-You keep track of showdown results to calibrate opponent ranges.
-```
-
-### 4.5 Matchmaker
+Validated at startup via Zod. Server fails fast on invalid config.
 
 ```
-Matchmaker runs continuously:
-
-1. Check for agents in queue (want to play)
-2. Group by wager tier ($1, $3, $5, $10)
-3. When 6 agents in same tier → create table
-4. Call create_table on L1
-5. Call join_table for each agent (deposits wager)
-6. Open spectator betting pool
-7. Wait 60 seconds for spectator bets
-8. Lock betting, start game
+PORT                          # Server port (default: 3001)
+LLM_PROVIDER                  # "gemini" or "openrouter" (default: "gemini")
+GOOGLE_GENERATIVE_AI_API_KEY  # Gemini API key
+OPENROUTER_API_KEY            # OpenRouter API key
+SOLANA_RPC_URL                # Solana RPC (default: devnet)
+AUTHORITY_PRIVATE_KEY         # Base58 private key (for deployments)
+AUTHORITY_KEYPAIR_PATH        # Path to JSON keypair file (for local dev)
+EPHEMERAL_PROVIDER_ENDPOINT   # MagicBlock ER RPC endpoint
+EPHEMERAL_WS_ENDPOINT         # MagicBlock ER WebSocket endpoint
+AUTO_MATCH_INTERVAL_MS        # Auto-queue check interval (default: 10000)
+AUTO_MATCH_ENABLED            # Enable auto-queue (default: "true")
 ```
+
+At least one of `AUTHORITY_PRIVATE_KEY` or `AUTHORITY_KEYPAIR_PATH` must be set.
+
+### 4.3 Turn Orchestrator Loop
+
+```
+async runGame(config: GameConfig):
+    // 1. Create game on L1
+    await solanaWrite.createGame(gameId, tableId, wagerTier)
+
+    // 2. Join all players on L1 (delegates PlayerHand PDAs)
+    for player in players:
+        await solanaWrite.joinGame(gameId, player.seatIndex, player.pubkey)
+
+    // 3. Delegate empty hand PDAs for unused seats
+    await solanaWrite.delegateEmptyHands(gameId, players.length)
+
+    // 4. Start game (delegates GameState to ER)
+    await solanaWrite.startGame(gameId)
+
+    // 5. Wait for GameState to appear on ER
+    await solanaWrite.waitForErAccount(gamePda)
+
+    // 6. Request VRF shuffle on ER
+    await solanaWrite.requestShuffle(gameId)
+
+    // 7. Poll for VRF callback (phase changes from Waiting)
+    erState = await solanaWrite.pollForVrfCallback(gameId)
+
+    // 8. Fetch hole cards for each player (from ER)
+    for each player: solanaWrite.getPlayerHand(gameId, seatIndex, fromEr=true)
+
+    // 9. Game loop
+    while erState.phase != "showdown" && erState.phase != "settled":
+        currentPlayer = erState.currentPlayer
+
+        // Get LLM decision
+        action = await llm.getAction(player.template, state, currentIdx)
+
+        // Submit action to ER
+        await solanaWrite.playerAction(gameId, actionCode, raiseAmount)
+
+        // Sync local state with ER state
+        erState = await solanaWrite.getGameState(gameId, fromEr=true)
+
+        // Broadcast to spectators via WebSocket
+        wsFeed.broadcastToGame(gameId, stateUpdate)
+
+    // 10. Run showdown on ER
+    await solanaWrite.showdownTest(gameId)
+
+    // 11. Commit game back to L1
+    await solanaWrite.commitGame(gameId)
+    await solanaWrite.waitForBaseLayerSettle(gameId)
+
+    // 12. Update agent stats on L1
+    for each player:
+        await solanaWrite.updateAgentStats(pubkey, games, wins, earnings)
+```
+
+### 4.4 LLM Gateway
+
+Supports two providers, configurable via `LLM_PROVIDER` env var:
+
+| Provider    | Model                        | Use Case          |
+|-------------|------------------------------|--------------------|
+| `gemini`    | Gemini 2.5 Flash             | Default, fast      |
+| `openrouter`| Meta Llama 3.3 70B Instruct  | Alternative        |
+
+Uses [Vercel AI SDK](https://sdk.vercel.ai/) (`ai` package) for structured output.
+
+```typescript
+const result = await generateText({
+    model: getModel(),          // Gemini or OpenRouter
+    system: template.systemPrompt,
+    prompt: buildUserMessage(gameState, playerIndex),
+    output: Output.object({ schema: GameActionSchema }),
+    maxRetries: 0,
+    abortSignal: AbortSignal.timeout(20000),
+});
+```
+
+The LLM output is validated with Zod:
+
+```typescript
+const GameActionSchema = z.object({
+    type: z.enum(["fold", "check", "call", "raise", "all_in"]),
+    amount: z.number().optional(), // BB for raises, converted to lamports
+});
+```
+
+**Hand Strength Evaluation:** Before sending to the LLM, each player's hole cards
+are evaluated with a percentile-based hand strength calculator (`lib/hand-evaluator.ts`).
+The tier (Premium/Strong/Good/Playable/Weak) and percentile are included in the prompt
+to help the LLM calibrate its decisions.
+
+**Fallback:** If all 3 LLM attempts fail, the action falls back to check (if free)
+or call.
+
+**Rate Limiting:** Configurable minimum delay between LLM calls (default: 6 seconds
+= 10 requests/minute).
+
+### 4.5 Agent Templates (System Prompts)
+
+Templates are defined in `lib/templates.ts` as an array of objects:
+
+| ID | Name   | Style              | Description                                    |
+|----|--------|--------------------|------------------------------------------------|
+| 0  | Shark  | tight-aggressive   | Selective hand play, aggressive betting         |
+| 1  | Maniac | loose-aggressive   | Plays 85% of hands, frequent bluffs            |
+| 2  | Rock   | tight-passive      | Patient, calls frequently, minimal bluffing    |
+| 3  | Fox    | balanced/tricky    | Check-raises, semi-bluffs, deceptive plays     |
+
+Each template includes a shared `POKER_BASICS` preamble covering:
+- Hand rankings
+- Heads-up range guidelines
+- Critical rules (never fold when free, call standard raises with playable hands)
+- BB notation and card format
+
+The game state prompt sent to the LLM is dynamically adapted:
+- Heads-up games get "This is HEADS-UP (1v1). Play wide ranges."
+- Multi-player games get "This is a N-player game. Tighten your ranges."
+
+### 4.6 Matchmaker
+
+The matchmaker manages player queues, table creation, and betting windows.
+
+```
+Queue flow:
+1. Player calls POST /api/queue/join with pubkey, displayName, template, wagerTier
+2. Matchmaker groups by wager tier
+3. When queue reaches 6 agents → creates table (UUID)
+4. Emits "tableFull" event → starts betting window
+5. Betting window: 60 seconds, countdown broadcast every 5 seconds
+6. After 60s → emits "bettingLocked" → game-lifecycle plugin starts game
+7. Stale queues cleaned up after 5 minutes (emits "queueTimeout")
+```
+
+Constants:
+- `AGENTS_PER_GAME = 6` (table size, but AutoQueue picks 2 for heads-up)
+- `BETTING_WINDOW_SECONDS = 60`
+- `BETTING_COUNTDOWN_INTERVAL_SECONDS = 5`
+- `QUEUE_TIMEOUT_MS = 300000` (5 minutes)
+
+### 4.7 AutoQueue
+
+Automatically pairs agents for continuous gameplay during development/demo:
+
+```
+Every AUTO_MATCH_INTERVAL_MS (default 10 seconds):
+1. Check if any table is in_progress or full → skip
+2. If a game just ended → enforce 15 second cooldown (for spectators)
+3. Fetch all registered agents from chain
+4. Shuffle and pick AGENTS_PER_GAME (2) agents
+5. Queue them into the matchmaker at LOWEST_WAGER_TIER (0.1 SOL)
+```
+
+Can be disabled via `AUTO_MATCH_ENABLED=false`.
+
+### 4.8 Data Storage
+
+**No database.** All persistent data lives on-chain:
+
+- **Agent stats** → AgentAccount on Solana L1
+- **Game history** → GameState accounts (phase = Complete) on Solana L1
+- **Leaderboard** → Derived from agent stats via getProgramAccounts (GPA)
+
+The `OnChainReader` (solana-read plugin) uses in-memory caching with TTLs:
+- Agent data: 10 second TTL
+- GPA queries (all agents, game history): 30 second TTL
+- Stats: 30 second TTL (activeGames updated live from GameTracker)
+
+### 4.9 API Endpoints
+
+| Method | Path                          | Description                              |
+|--------|-------------------------------|------------------------------------------|
+| GET    | `/health`                     | Health check → `{ status: "ok" }`        |
+| GET    | `/api/agents`                 | List all agents (pagination: offset, limit) |
+| GET    | `/api/agents/:pubkey`         | Single agent details + vault balance     |
+| GET    | `/api/games/:gameId`          | Active game state (from orchestrator)    |
+| GET    | `/api/games/agent/:pubkey`    | Completed game history for agent         |
+| GET    | `/api/tables`                 | All active tables                        |
+| GET    | `/api/tables/:tableId`        | Single table details                     |
+| POST   | `/api/tables/:tableId/bet`    | Place spectator bet (wallet, agent, amount) |
+| GET    | `/api/tables/:tableId/pool`   | Betting pool totals                      |
+| POST   | `/api/queue/join`             | Join matchmaking queue                   |
+| GET    | `/api/leaderboard`            | Agents ranked by wins                    |
+| GET    | `/api/stats`                  | Global stats (games, agents, volume)     |
+| WS     | `/ws`                         | WebSocket feed for live game updates     |
+
+### 4.10 WebSocket Messages
+
+Connect to `ws://host:port/ws`. Subscribe to games/tables:
+
+```json
+// Subscribe
+{ "type": "subscribe", "gameId": "123", "tableId": "abc" }
+// → Ack: { "type": "subscribe_ack", ... }
+
+// Unsubscribe
+{ "type": "unsubscribe", "gameId": "123" }
+```
+
+Server broadcasts these message types:
+
+| Type                  | Trigger                          | Data                       |
+|-----------------------|----------------------------------|----------------------------|
+| `game_start`          | Game begins                      | Full GameStateSnapshot     |
+| `game_state`          | State sync (phase change, etc.)  | Full GameStateSnapshot     |
+| `game_action`         | Player takes action              | GameStateSnapshot + action |
+| `game_end`            | Game settled                     | Final GameStateSnapshot    |
+| `betting_countdown`   | Every 5s during betting window   | BettingWindowData          |
+| `betting_locked`      | Betting window closes            | BettingWindowData          |
+| `pool_update`         | Bet placed                       | Pool totals                |
+| `queue_timeout`       | Queue cleaned up                 | Refunded players           |
+| `next_game_countdown` | AutoQueue cooldown               | Seconds remaining          |
 
 ---
 
@@ -481,7 +643,7 @@ Matchmaker runs continuously:
 
 ### 5.1 Tech Stack
 
-- **Next.js** (App Router)
+- **Next.js 15** (App Router)
 - **Tailwind CSS** for styling
 - **@solana/wallet-adapter** for wallet connection
 - **Native WebSocket** client for live game feed
@@ -490,13 +652,11 @@ Matchmaker runs continuously:
 ### 5.2 Pages
 
 ```
-/                           → Landing page (overview, stats)
-/play                       → Create/manage your agent
-/play/create                → Pick template, name agent, fund wallet
-/play/dashboard             → Agent stats, wallet balance, withdraw
+/                           → Landing page (live arena, stats, FAQ)
+/agents                     → Browse all registered agents
+/agents/[pubkey]            → Agent detail view (stats, game history)
 /tables                     → Browse open/live tables
-/tables/[id]                → Live spectator view of a game
-/tables/[id]/bet            → Place spectator bet (pre-game)
+/tables/[tableId]           → Live spectator view of a game
 /leaderboard                → Top agents by winnings
 ```
 
@@ -507,35 +667,17 @@ Matchmaker runs continuously:
 │                SPECTATOR VIEW                     │
 │                                                   │
 │   Player 1 (Shark)     Player 2 (Fox)            │
-│   [$45] 🟢 Active      [$32] Folded              │
+│   [$45] Active          [$32] Folded              │
 │   [??][??]              [--][--]                  │
-│                                                   │
-│        Player 3 (Rock)                            │
-│        [$50] 🟢 Waiting                           │
-│        [??][??]                                   │
 │                                                   │
 │           ┌─────────────────┐                     │
 │           │  [K♠] [9♥] [3♦] │  Pot: $28          │
 │           │    FLOP          │                     │
 │           └─────────────────┘                     │
 │                                                   │
-│        Player 4 (Maniac)                          │
-│        [$22] 🟢 THINKING...                       │
-│        [??][??]                                   │
-│                                                   │
-│   Player 5 (Shark)     Player 6 (Fox)            │
-│   [$38] 🟢 Active      [$13] All-In              │
+│   Player 3 (Maniac)    Player 4 (Rock)           │
+│   [$22] THINKING...     [$13] All-In              │
 │   [??][??]              [??][??]                  │
-│                                                   │
-│  ┌──────────────────────────────────────────┐     │
-│  │ 💭 Maniac is thinking:                   │     │
-│  │ "Two overcards on the flop. I have       │     │
-│  │  middle pair. The pot odds justify a      │     │
-│  │  semi-bluff raise here to put pressure    │     │
-│  │  on the remaining players."               │     │
-│  │                                           │     │
-│  │ Action: RAISE $8                          │     │
-│  └──────────────────────────────────────────┘     │
 │                                                   │
 │  ┌─ SPECTATOR BETS ─────────────────────────┐    │
 │  │ Your bet: $5 on Player 1 (Shark)         │    │
@@ -552,132 +694,127 @@ Matchmaker runs continuously:
 Phase 1: TABLE SETUP
 ──────────────────────────────────────────────────
   Agent owner → create_agent(template, name)     [L1 tx]
-  Agent owner → fund_agent(5 SOL)                [L1 tx]
-  Agent owner → queue_for_game(wager_tier)       [API call]
-  Matchmaker  → create_table(wager_tier)         [L1 tx]
-  Matchmaker  → join_table(agent) x6             [L1 tx — escrows wager]
-  Matchmaker  → create_pool(table_id)            [L1 tx]
+  Agent owner → fund_agent(amount)               [L1 tx]
+  AutoQueue   → polls for agents                 [API call, every 10s]
+  AutoQueue   → matchmaker.joinQueue(agent)      [internal]
+  Matchmaker  → creates table when queue fills   [internal, UUID]
 
 Phase 2: BETTING WINDOW (60 seconds)
 ──────────────────────────────────────────────────
-  Spectator   → place_bet(agent, amount)         [L1 tx]
-  Frontend    → show table preview, agent stats
+  Spectator   → POST /api/tables/:id/bet         [API call]
+  WS Feed     → betting_countdown every 5s       [WebSocket]
   Timer       → 60s countdown
+  WS Feed     → betting_locked                   [WebSocket]
 
-Phase 3: GAME DELEGATION
+Phase 3: GAME SETUP ON CHAIN
 ──────────────────────────────────────────────────
-  Game server → delegate GameState to PER         [L1 tx]
-  Game server → delegate PlayerHand[0..5] to PER  [L1 tx]
-  Game server → set permissions (each hand → agent only)
-  Game server → lock betting pool                 [L1 tx]
+  Orchestrator → createGame(gameId, tableId)      [L1 tx]
+  Orchestrator → joinGame(gameId, seat, pubkey)   [L1 tx × N players]
+  Orchestrator → delegateEmptyHands              [L1 tx × (6 - N)]
+  Orchestrator → startGame (delegate to ER)       [L1 tx]
+  Orchestrator → waitForErAccount                 [ER polling]
 
 Phase 4: GAME PLAY (inside PER)
 ──────────────────────────────────────────────────
-  Game server → initialize_game → triggers VRF    [PER tx]
-  VRF oracle  → vrf_callback(randomness)          [PER tx]
-              → deck shuffled, hands dealt
+  Orchestrator → requestShuffle                   [ER tx + VRF CPI]
+  VRF oracle   → callback: shuffle + deal         [ER tx]
+  Orchestrator → fetch hole cards from ER         [ER reads]
 
-  LOOP (until game ends):
-    Game server → read GameState (public fields)  [PER read]
-    Game server → read PlayerHand[active] (permissioned) [PER read]
-    Game server → call LLM with visible state     [HTTP to LLM API]
-    LLM         → returns action + reasoning      [HTTP response]
-    Game server → player_action(index, action)    [PER tx]
-    Game server → broadcast to spectators         [WebSocket]
-    (2 second delay for spectator viewing)
+  LOOP (until showdown or single player remains):
+    Orchestrator → getGameState from ER           [ER read]
+    Orchestrator → LLM.getAction(template, state) [HTTP to LLM API]
+    LLM          → returns action (fold/check/...) [HTTP response]
+    Orchestrator → playerAction on ER              [ER tx]
+    Orchestrator → broadcast state via WebSocket   [WS broadcast]
 
 Phase 5: SHOWDOWN
 ──────────────────────────────────────────────────
-  Game server → showdown()                        [PER tx]
-              → all hands revealed
+  Orchestrator → showdownTest()                   [ER tx]
               → winner determined
-  Game server → broadcast final result + all hands [WebSocket]
+  Orchestrator → broadcast game_end               [WebSocket]
 
 Phase 6: SETTLEMENT
 ──────────────────────────────────────────────────
-  Game server → undelegate all accounts from PER  [L1 tx]
-  Game server → settle_table(winner)              [L1 tx]
-              → 95% pot → winner agent wallet
-              → 5% pot → platform treasury
-  Game server → settle_pool(winner)               [L1 tx]
-              → 95% pool → winning bettors (pro-rata)
-              → 5% pool → platform treasury
-  Game server → update agent stats (wins, earnings) [L1 tx]
+  Orchestrator → commitGame()                     [ER tx — undelegates to L1]
+  Orchestrator → waitForBaseLayerSettle           [L1 polling]
+  Lifecycle    → updateAgentStats for each player [L1 tx × N]
+  Lifecycle    → autoQueue.notifyGameEnded()      [internal]
+  AutoQueue    → 15s cooldown, then next game     [internal]
 ```
 
 ---
 
 ## 7. Cost Estimates (Per Game)
 
-| Item                         | Cost       |
-| ---------------------------- | ---------- |
-| LLM calls (~800 calls/game)  | ~$0.15     |
+| Item                          | Cost       |
+| ----------------------------- | ---------- |
+| LLM calls (~20 calls/game)   | ~$0.01     |
 | Solana L1 txs (~15 txs)      | ~$0.01     |
 | PER txs (~60 txs)            | ~$0.05     |
 | VRF request                  | ~$0.01     |
-| **Total platform cost**      | **~$0.22** |
+| **Total platform cost**      | **~$0.08** |
 
-Revenue per game ($5 wager tier, 6 players):
-| Source                       | Amount     |
-| ---------------------------- | ---------- |
-| Agent rake (5% of $30 pot)   | $1.50      |
-| Spectator rake (5% of ~$100) | $5.00      |
-| **Total revenue**            | **~$6.50** |
-
-**Margin: ~$6.28 per game (~97%)**
+Revenue per game (0.1 SOL wager tier, 2 players):
+| Source                           | Amount     |
+| -------------------------------- | ---------- |
+| Agent rake (5% of 0.2 SOL pot)  | 0.01 SOL   |
+| Spectator rake (5% of pool)     | Variable   |
 
 ---
 
 ## 8. Tech Stack Summary
 
-| Layer               | Technology                              |
-| ------------------- | --------------------------------------- |
-| Blockchain          | Solana (mainnet)                        |
-| Smart contracts     | Anchor (Rust)                           |
-| Game execution      | MagicBlock Private Ephemeral Rollup     |
-| Randomness          | MagicBlock VRF                          |
-| Game server         | Fastify / TypeScript                    |
-| LLM                 | Claude Haiku 4.5 (primary)              |
-| Frontend            | Next.js + Tailwind + Motion (motion.dev)|
-| Wallet              | Solana Wallet Adapter                   |
-| Real-time feed      | WebSocket (@fastify/websocket)          |
-| Database            | PostgreSQL (game history, leaderboards) |
-| Hosting             | Vercel (frontend) + Railway (server)    |
+| Layer               | Technology                               |
+| ------------------- | ---------------------------------------- |
+| Blockchain          | Solana (devnet, targeting mainnet)       |
+| Smart contracts     | Anchor (Rust)                            |
+| Game execution      | MagicBlock Private Ephemeral Rollup      |
+| Randomness          | MagicBlock VRF                           |
+| Game server         | Fastify 5 / TypeScript (plugin architecture) |
+| Schema validation   | TypeBox (routes) + Zod (env, LLM output) |
+| LLM                 | Gemini 2.5 Flash (default) / Llama 3.3 70B (OpenRouter) |
+| AI SDK              | Vercel AI SDK (`ai` package)             |
+| Frontend            | Next.js 15 + Tailwind + Motion           |
+| Wallet              | @solana/wallet-adapter                   |
+| Real-time feed      | WebSocket (@fastify/websocket)           |
+| Data storage        | On-chain (no database)                   |
+| Containerization    | Docker (multi-stage pnpm build)          |
+| Testing             | Vitest                                   |
+| Monorepo            | pnpm workspaces + Turborepo              |
 
 ---
 
 ## 9. MVP Milestones
 
 ```
-M1: On-chain programs (2-3 weeks)
-    - Agent Program (create, fund, withdraw)
-    - Wager Escrow Program (join, settle, refund)
-    - Spectator Betting Program (bet, settle, claim)
+M1: On-chain programs ✅
+    - Agent Program (create, fund, withdraw, update_stats)
+    - Wager Escrow Program (create, join, start, settle, refund)
+    - Spectator Betting Program (create, bet, lock, settle, claim)
+    - Poker Game Program with MagicBlock delegation + VRF
     - Deploy to devnet
 
-M2: Poker game program on PER (2-3 weeks)
-    - Game state management
-    - Poker logic (hand evaluation, betting rounds)
-    - VRF card dealing
-    - Privacy permissions for player hands
-    - Test on MagicBlock devnet TEE
+M2: Game server ✅
+    - Plugin-based Fastify architecture
+    - Turn orchestrator with full L1 ↔ ER flow
+    - LLM gateway (Gemini + OpenRouter)
+    - 4 agent templates with hand strength evaluation
+    - Matchmaker with betting windows
+    - AutoQueue for continuous play
+    - WebSocket feed for live updates
+    - REST API for agents, games, tables, stats
 
-M3: Game server (1-2 weeks)
-    - Turn orchestrator
-    - LLM gateway + 4 templates
-    - Matchmaker
-    - Spectator WebSocket feed (@fastify/websocket)
-
-M4: Frontend (2-3 weeks)
-    - Landing page
-    - Agent creation flow
+M3: Frontend ✅
+    - Landing page with live arena
+    - Agent browsing and creation
     - Live spectator view with animations
-    - Spectator betting UI
     - Leaderboard
+    - Wallet connect integration
 
-M5: Integration + testing (1-2 weeks)
+M4: Integration + polish (in progress)
     - End-to-end testing on devnet
+    - Spectator betting UI integration
+    - Fund/withdraw agent wallet UI
     - Load testing (concurrent games)
-    - Security audit (escrow logic)
     - Mainnet deployment
 ```

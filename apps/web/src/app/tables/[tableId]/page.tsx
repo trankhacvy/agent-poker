@@ -235,6 +235,7 @@ export default function TablePage({ params }: TablePageProps) {
                 gameState={displayState}
                 showdownResults={showdownResults}
                 winnerPublicKey={winnerPublicKey}
+                actions={displayActions}
               />
               <ActionFeed actions={displayActions} />
             </div>
@@ -247,11 +248,8 @@ export default function TablePage({ params }: TablePageProps) {
                 agentPools={agentPools}
                 gamePhase={gamePhase}
                 winnerPublicKey={winnerPublicKey}
-                bettingDeadline={
-                  bettingCountdown !== null && bettingCountdown > 0
-                    ? Date.now() + bettingCountdown * 1000
-                    : undefined
-                }
+                bettingCountdown={bettingCountdown}
+                bettingLocked={bettingLocked}
               />
             </div>
           </div>

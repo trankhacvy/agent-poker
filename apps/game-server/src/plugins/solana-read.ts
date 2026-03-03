@@ -1,3 +1,5 @@
+import fp from "fastify-plugin";
+import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import {
   createSolanaRpc,
   address,
@@ -67,19 +69,26 @@ function bigintToNumber(val: bigint): number {
   return Number(val);
 }
 
-/** Convert discriminator bytes to base58 string for memcmp filters */
-function discriminatorToBase58(discriminatorBytes: Uint8Array | { readonly [index: number]: number; readonly length: number }): string {
-  return getBase58Decoder().decode(new Uint8Array(discriminatorBytes as ArrayLike<number>));
+function discriminatorToBase58(
+  discriminatorBytes:
+    | Uint8Array
+    | { readonly [index: number]: number; readonly length: number }
+): string {
+  return getBase58Decoder().decode(
+    new Uint8Array(discriminatorBytes as ArrayLike<number>)
+  );
 }
 
 export class OnChainReader {
   private rpc: Rpc<SolanaRpcApi>;
   private cache = new Map<string, CacheEntry<unknown>>();
-  private readonly AGENT_TTL = 10_000; // 10s
-  private readonly GPA_TTL = 30_000; // 30s
+  private readonly AGENT_TTL = 10_000;
+  private readonly GPA_TTL = 30_000;
+  private log: FastifyBaseLogger;
 
-  constructor(rpcUrl: string) {
+  constructor(rpcUrl: string, log: FastifyBaseLogger) {
     this.rpc = createSolanaRpc(rpcUrl);
+    this.log = log;
   }
 
   private getCached<T>(key: string): T | null {
@@ -125,21 +134,21 @@ export class OnChainReader {
       const account = await fetchMaybeAgentAccount(this.rpc, addr);
       if (!account.exists) return null;
 
-      // Fetch vault balance
       let vaultBalance = 0;
       try {
         const balanceResult = await this.rpc
           .getBalance(address(account.data.vault))
           .send();
         vaultBalance = bigintToNumber(balanceResult.value);
-      } catch {
-        // vault may not exist yet
+      } catch (err) {
+        this.log.debug({ err }, "Vault balance fetch failed (may not exist yet)");
       }
 
       const result = this.mapAgent(agentPubkey, account.data, vaultBalance);
       this.setCache(cacheKey, result, this.AGENT_TTL);
       return result;
-    } catch {
+    } catch (err) {
+      this.log.debug({ err }, "Failed to fetch agent");
       return null;
     }
   }
@@ -182,7 +191,13 @@ export class OnChainReader {
       const agents: AgentResponse[] = [];
       const accounts = response as unknown as {
         pubkey: Address;
-        account: { data: [string, string]; executable: boolean; lamports: bigint; owner: Address; space: bigint };
+        account: {
+          data: [string, string];
+          executable: boolean;
+          lamports: bigint;
+          owner: Address;
+          space: bigint;
+        };
       }[];
 
       for (const entry of accounts) {
@@ -190,13 +205,14 @@ export class OnChainReader {
           const data = Buffer.from(entry.account.data[0], "base64");
           const decoded = decoder.decode(data);
           agents.push(this.mapAgent(entry.pubkey as string, decoded));
-        } catch {
-          // skip malformed accounts
+        } catch (err) {
+          this.log.debug({ err }, "Skipping malformed agent account");
         }
       }
 
       return agents;
-    } catch {
+    } catch (err) {
+      this.log.debug({ err }, "GPA fetch for agents failed");
       return [];
     }
   }
@@ -214,8 +230,9 @@ export class OnChainReader {
       this.setCache(cacheKey, allGames, this.GPA_TTL);
     }
 
-    // Most recent first
-    const sorted = [...allGames].sort((a, b) => b.completedAt - a.completedAt);
+    const sorted = [...allGames].sort(
+      (a, b) => b.completedAt - a.completedAt
+    );
     const paginated = sorted.slice(offset, offset + limit);
     return { games: paginated, total: allGames.length };
   }
@@ -244,7 +261,13 @@ export class OnChainReader {
       const games: GameHistoryResponse[] = [];
       const accounts = response as unknown as {
         pubkey: Address;
-        account: { data: [string, string]; executable: boolean; lamports: bigint; owner: Address; space: bigint };
+        account: {
+          data: [string, string];
+          executable: boolean;
+          lamports: bigint;
+          owner: Address;
+          space: bigint;
+        };
       }[];
 
       for (const entry of accounts) {
@@ -252,10 +275,8 @@ export class OnChainReader {
           const data = Buffer.from(entry.account.data[0], "base64");
           const gs = decoder.decode(data);
 
-          // Only completed games
           if (gs.phase !== GamePhase.Complete) continue;
 
-          // Check if agent participated
           const playerAddresses = Array.from(gs.players)
             .slice(0, gs.playerCount)
             .map((p) => p.toString());
@@ -276,13 +297,14 @@ export class OnChainReader {
             })),
             completedAt: bigintToNumber(gs.lastActionAt),
           });
-        } catch {
-          // skip malformed accounts
+        } catch (err) {
+          this.log.debug({ err }, "Skipping malformed game account");
         }
       }
 
       return games;
-    } catch {
+    } catch (err) {
+      this.log.debug({ err }, "GPA fetch for games failed");
       return [];
     }
   }
@@ -307,7 +329,6 @@ export class OnChainReader {
       totalGamesPlayed += agent.gamesPlayed;
       totalVolume += Math.abs(agent.earnings);
     }
-    // Each game has 2+ players, so divide for unique games (approximation)
     totalGamesPlayed = Math.floor(totalGamesPlayed / 2);
 
     const result: StatsResponse = {
@@ -320,3 +341,18 @@ export class OnChainReader {
     return { ...result, activeGames: activeGameCount };
   }
 }
+
+declare module "fastify" {
+  interface FastifyInstance {
+    solanaRead: OnChainReader;
+  }
+}
+
+export default fp(
+  async (fastify: FastifyInstance) => {
+    const reader = new OnChainReader(fastify.env.SOLANA_RPC_URL, fastify.log);
+    fastify.decorate("solanaRead", reader);
+    fastify.log.info("Solana read plugin loaded");
+  },
+  { name: "solana-read", dependencies: ["env"] }
+);

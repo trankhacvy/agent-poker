@@ -74,6 +74,7 @@ export interface WsMessage {
     | "betting_locked"
     | "queue_timeout"
     | "pool_update"
+    | "next_game_countdown"
     | "error";
   data:
     | GameStateSnapshot
@@ -82,6 +83,7 @@ export interface WsMessage {
     | BettingWindowData
     | QueueTimeoutData
     | { totalPool: number; agentPools: Record<string, number> }
+    | { secondsRemaining: number }
     | { message: string };
   gameId?: string;
   tableId?: string;

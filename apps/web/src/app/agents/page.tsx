@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AgentData, QueueStatus } from "@/lib/types";
 import { WAGER_TIERS } from "@/lib/constants";
-import { fetchAgents, joinQueue } from "@/lib/api";
+import { joinQueue } from "@/lib/api";
+import { useAgents } from "@/hooks/queries";
 import AgentCard from "@/components/agent/AgentCard";
 import CreateAgentForm from "@/components/agent/CreateAgentForm";
 import { Button } from "@/components/ui/button";
@@ -16,14 +17,10 @@ import {
 } from "@/components/ui/select";
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<AgentData[]>([]);
+  const { data: agents = [] } = useAgents();
   const [queueStatuses, setQueueStatuses] = useState<Record<string, QueueStatus>>({});
   const [selectedTiers, setSelectedTiers] = useState<Record<string, number>>({});
   const [queueLoading, setQueueLoading] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    fetchAgents().then(setAgents);
-  }, []);
 
   function handleFund(publicKey: string) {
     console.log("Fund agent:", publicKey);

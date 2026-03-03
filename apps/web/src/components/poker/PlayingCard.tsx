@@ -1,4 +1,7 @@
+"use client";
+
 import type { Rank, Suit } from "@/lib/types";
+import { m } from "motion/react";
 
 const RANKS: Rank[] = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
 const SUITS: Suit[] = ["hearts", "diamonds", "clubs", "spades"];
@@ -11,10 +14,10 @@ const suitSymbols: Record<Suit, string> = {
 };
 
 const suitColors: Record<Suit, string> = {
-  hearts: "text-[#ff6b6b]",
-  diamonds: "text-[#fca311]",
-  clubs: "text-[#4ea8de]",
-  spades: "text-[#64d2d0]",
+  hearts: "text-red-500",
+  diamonds: "text-red-500",
+  clubs: "text-gray-800",
+  spades: "text-gray-800",
 };
 
 function decodeCard(code: number): { rank: Rank; suit: Suit } {
@@ -30,52 +33,96 @@ interface CardProps {
   card: number;
   faceUp: boolean;
   size?: "sm" | "md" | "lg";
+  index?: number;
+  animateFlip?: boolean;
+  animateDeal?: boolean;
 }
 
-export default function PlayingCard({ card, faceUp, size = "md" }: CardProps) {
-  const sizes = {
-    sm: "w-10 h-14",
-    md: "w-12 h-[4.25rem]",
-    lg: "w-[4.5rem] h-[6.25rem]",
-  };
+const sizes = {
+  sm: "w-11 h-[60px]",
+  md: "w-14 h-[76px]",
+  lg: "w-[72px] h-[100px]",
+};
 
-  const rankSizes = {
-    sm: "text-base",
-    md: "text-xl",
-    lg: "text-3xl",
-  };
+const rankSizes = {
+  sm: "text-sm",
+  md: "text-lg",
+  lg: "text-2xl",
+};
 
-  const cornerSizes = {
-    sm: "text-[8px]",
-    md: "text-[10px]",
-    lg: "text-sm",
-  };
+const cornerSizes = {
+  sm: "text-[7px]",
+  md: "text-[9px]",
+  lg: "text-xs",
+};
 
-  if (!faceUp) {
-    return (
-      <div
-        className={`${sizes[size]} flex-shrink-0 rounded-lg border-2 border-white/10 bg-[#64d2d0] shadow-lg relative overflow-hidden`}
-      >
-        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_25%,rgba(255,255,255,0.2)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.2)_75%,rgba(255,255,255,0.2)_100%)] bg-[length:8px_8px]" />
-      </div>
-    );
-  }
-
+export default function PlayingCard({
+  card,
+  faceUp,
+  size = "md",
+  index = 0,
+  animateFlip = false,
+  animateDeal = false,
+}: CardProps) {
   const { rank, suit } = decodeCard(card);
   const symbol = suitSymbols[suit];
   const color = suitColors[suit];
 
-  return (
+  const cardFront = (
     <div
-      className={`${sizes[size]} flex-shrink-0 rounded-lg border border-white/10 bg-[#232f3e] shadow-lg flex flex-col items-center justify-center relative`}
+      className={`${sizes[size]} flex-shrink-0 rounded-lg bg-white shadow-lg flex flex-col items-center justify-center relative border border-gray-200`}
+      style={{ backfaceVisibility: animateFlip ? "hidden" : undefined }}
     >
-      <span className={`font-bold ${color} ${rankSizes[size]}`}>{rank}</span>
-      <span className={`absolute top-1 left-1.5 ${color} ${cornerSizes[size]} leading-none`}>
+      {/* Center rank + suit */}
+      <span className={`font-bold ${color} ${rankSizes[size]} leading-none`}>{rank}</span>
+      <span className={`${color} text-[10px] leading-none mt-0.5`}>{symbol}</span>
+      {/* Top-left corner */}
+      <span className={`absolute top-1 left-1.5 ${color} ${cornerSizes[size]} leading-none font-semibold`}>
+        {rank}
+        <br />
         {symbol}
       </span>
-      <span className={`absolute bottom-1 right-1.5 rotate-180 ${color} ${cornerSizes[size]} leading-none`}>
+      {/* Bottom-right corner */}
+      <span className={`absolute bottom-1 right-1.5 rotate-180 ${color} ${cornerSizes[size]} leading-none font-semibold`}>
+        {rank}
+        <br />
         {symbol}
       </span>
     </div>
   );
+
+  const cardBack = (
+    <div
+      className={`${sizes[size]} flex-shrink-0 rounded-lg shadow-lg relative overflow-hidden`}
+      style={{
+        backgroundImage: "url(/card-back.png)",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backfaceVisibility: animateFlip ? "hidden" : undefined,
+        transform: animateFlip ? "rotateY(180deg)" : undefined,
+      }}
+    />
+  );
+
+  const content = faceUp ? cardFront : cardBack;
+
+  if (animateDeal) {
+    return (
+      <m.div
+        initial={{ opacity: 0, y: -30, scale: 0.5 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{
+          duration: 0.4,
+          delay: index * 0.1,
+          type: "spring",
+          stiffness: 300,
+          damping: 20,
+        }}
+      >
+        {content}
+      </m.div>
+    );
+  }
+
+  return content;
 }

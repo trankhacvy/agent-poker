@@ -16,6 +16,7 @@
     "@ai-sdk/google": "^3.0.31",
     "@coral-xyz/anchor": "^0.32.0",
     "@fastify/cors": "^10.0.0",
+    "@fastify/type-provider-typebox": "^6.1.0",
     "@fastify/websocket": "^11.0.0",
     "@magicblock-labs/ephemeral-rollups-sdk": "^0.8.5",
     "@openrouter/ai-sdk-provider": "^2.2.3",
@@ -27,6 +28,7 @@
     "bs58": "^6.0.0",
     "dotenv": "^16.4.0",
     "fastify": "^5.0.0",
+    "fastify-plugin": "^5.1.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

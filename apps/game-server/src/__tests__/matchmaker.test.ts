@@ -22,11 +22,11 @@ class MockWsFeed {
 
 describe("Matchmaker - queue system", () => {
   let mockWsFeed: MockWsFeed;
-  let Matchmaker: typeof import("../matchmaker.js").Matchmaker;
+  let Matchmaker: typeof import("../plugins/matchmaker.js").Matchmaker;
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    const mod = await import("../matchmaker.js");
+    const mod = await import("../plugins/matchmaker.js");
     Matchmaker = mod.Matchmaker;
     mockWsFeed = new MockWsFeed();
   });
@@ -120,11 +120,11 @@ describe("Matchmaker - queue system", () => {
 
 describe("Matchmaker - betting window", () => {
   let mockWsFeed: MockWsFeed;
-  let Matchmaker: typeof import("../matchmaker.js").Matchmaker;
+  let Matchmaker: typeof import("../plugins/matchmaker.js").Matchmaker;
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    const mod = await import("../matchmaker.js");
+    const mod = await import("../plugins/matchmaker.js");
     Matchmaker = mod.Matchmaker;
     mockWsFeed = new MockWsFeed();
   });
@@ -167,11 +167,11 @@ describe("Matchmaker - betting window", () => {
 
 describe("Matchmaker - betting pools", () => {
   let mockWsFeed: MockWsFeed;
-  let Matchmaker: typeof import("../matchmaker.js").Matchmaker;
+  let Matchmaker: typeof import("../plugins/matchmaker.js").Matchmaker;
 
   beforeEach(async () => {
     vi.useFakeTimers();
-    const mod = await import("../matchmaker.js");
+    const mod = await import("../plugins/matchmaker.js");
     Matchmaker = mod.Matchmaker;
     mockWsFeed = new MockWsFeed();
   });

@@ -1,37 +1,24 @@
 import { Type } from "@sinclair/typebox";
 import type { FastifyInstance } from "fastify";
-import type { OnChainReader } from "../on-chain-reader.js";
+import { AgentSchema } from "../schemas/index.js";
 
-const LeaderboardEntrySchema = Type.Object({
-  pubkey: Type.String(),
-  owner: Type.String(),
-  displayName: Type.String(),
-  template: Type.Number(),
-  vault: Type.String(),
-  balance: Type.Number(),
-  gamesPlayed: Type.Number(),
-  wins: Type.Number(),
-  earnings: Type.Number(),
-  createdAt: Type.Number(),
-});
-
-export function registerLeaderboardRoutes(
-  fastify: FastifyInstance,
-  reader: OnChainReader
-): void {
+export default async function leaderboardRoutes(
+  fastify: FastifyInstance
+): Promise<void> {
   fastify.get(
-    "/api/leaderboard",
+    "/leaderboard",
     {
       schema: {
         response: {
           200: Type.Object({
-            leaderboard: Type.Array(LeaderboardEntrySchema),
+            leaderboard: Type.Array(AgentSchema),
           }),
         },
       },
     },
     async () => {
-      const leaderboard = await reader.getLeaderboard();
+      const leaderboard =
+        await fastify.solanaRead.getLeaderboard();
       return { leaderboard };
     }
   );

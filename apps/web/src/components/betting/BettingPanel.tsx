@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import type { PlayerSnapshot, UserBet, BettingResult, GamePhase } from "@/lib/types";
 import { placeBet } from "@/lib/api";
@@ -10,26 +10,28 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
+const BETTING_WINDOW_TOTAL = 60;
+
 interface BettingPanelProps {
   tableId: string;
   players: PlayerSnapshot[];
   poolTotal: number;
   agentPools: Record<string, number>;
-  bettingDeadline?: number;
   gamePhase?: GamePhase;
   winnerPublicKey?: string;
+  bettingCountdown: number | null;
+  bettingLocked: boolean;
 }
-
-const BETTING_WINDOW_SECONDS = 30;
 
 export default function BettingPanel({
   tableId,
   players,
   poolTotal,
   agentPools,
-  bettingDeadline,
   gamePhase = "playing",
   winnerPublicKey,
+  bettingCountdown,
+  bettingLocked,
 }: BettingPanelProps) {
   const { connected, publicKey } = useWallet();
   const [selectedAgent, setSelectedAgent] = useState("");
@@ -38,47 +40,13 @@ export default function BettingPanel({
   const [error, setError] = useState<string | null>(null);
   const [userBet, setUserBet] = useState<UserBet | null>(null);
   const [bettingResult, setBettingResult] = useState<BettingResult | null>(null);
-  const [countdown, setCountdown] = useState(BETTING_WINDOW_SECONDS);
-  const [bettingExpired, setBettingExpired] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activePlayers = players.filter((p) => p.status !== "folded");
 
-  const startCountdown = useCallback(() => {
-    if (timerRef.current) clearInterval(timerRef.current);
-
-    if (bettingDeadline) {
-      const remaining = Math.max(0, Math.floor((bettingDeadline - Date.now()) / 1000));
-      setCountdown(remaining);
-      if (remaining === 0) {
-        setBettingExpired(true);
-        return;
-      }
-    } else {
-      setCountdown(BETTING_WINDOW_SECONDS);
-    }
-
-    setBettingExpired(false);
-    timerRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          setBettingExpired(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  }, [bettingDeadline]);
-
-  useEffect(() => {
-    if (gamePhase === "playing" && !userBet) {
-      startCountdown();
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [gamePhase, userBet, startCountdown]);
+  // Derive UI state from WebSocket-driven props
+  const bettingExpired = bettingLocked || bettingCountdown === 0;
+  const countdown = bettingCountdown ?? 0;
+  const countdownProgress = bettingCountdown != null ? (bettingCountdown / BETTING_WINDOW_TOTAL) * 100 : 0;
 
   useEffect(() => {
     if (gamePhase === "complete" && userBet && winnerPublicKey) {
@@ -115,7 +83,6 @@ export default function BettingPanel({
         amount: parseFloat(betAmount),
         timestamp: Date.now(),
       });
-      if (timerRef.current) clearInterval(timerRef.current);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to place bet");
     } finally {
@@ -133,7 +100,51 @@ export default function BettingPanel({
   }
 
   const potentialPayout = calculatePotentialPayout();
-  const countdownProgress = (countdown / BETTING_WINDOW_SECONDS) * 100;
+
+  // Spectator result view: game complete but user didn't bet
+  if (gamePhase === "complete" && !userBet) {
+    const winnerPlayer = players.find((p) => p.publicKey === winnerPublicKey);
+    return (
+      <Card>
+        <CardHeader className="border-b border-border py-2 px-4">
+          <CardTitle className="text-sm font-medium text-foreground">Game Result</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div className="flex items-center justify-center gap-2 py-2">
+            <span className="text-2xl">{"\u{1F3C6}"}</span>
+            <span className="text-lg font-bold text-secondary">
+              {winnerPlayer?.displayName ?? "Unknown"} wins!
+            </span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {players.map((player) => {
+              const pool = agentPools[player.publicKey] ?? 0;
+              const isWinner = player.publicKey === winnerPublicKey;
+              return (
+                <div
+                  key={player.publicKey}
+                  className={`flex items-center justify-between px-3 py-2 text-sm border-2 ${
+                    isWinner
+                      ? "border-secondary bg-secondary/10"
+                      : "border-border bg-muted"
+                  }`}
+                >
+                  <span className="text-foreground">
+                    {isWinner && "\u{1F451} "}{player.displayName}
+                  </span>
+                  <span className="text-muted-foreground">{pool} SOL</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between text-sm pt-1">
+            <span className="text-muted-foreground">Total Pool</span>
+            <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (gamePhase === "complete" && bettingResult) {
     return (
@@ -194,6 +205,40 @@ export default function BettingPanel({
     );
   }
 
+  // Locked-betting pool summary: betting closed but user didn't bet
+  if (bettingExpired && !userBet) {
+    return (
+      <Card>
+        <CardHeader className="border-b border-border py-2 px-4">
+          <CardTitle className="text-sm font-medium text-foreground">Betting Pool</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 p-4">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total Pool</span>
+            <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {activePlayers.map((player) => {
+              const pool = agentPools[player.publicKey] ?? 0;
+              return (
+                <div
+                  key={player.publicKey}
+                  className="flex items-center justify-between px-3 py-2 text-sm border-2 border-border bg-muted"
+                >
+                  <span className="text-foreground">{player.displayName}</span>
+                  <span className="text-muted-foreground">{pool} SOL</span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-center text-xs text-muted-foreground">
+            Betting window closed. Watching game...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader className="border-b border-border py-2 px-4">
@@ -205,7 +250,7 @@ export default function BettingPanel({
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Time Remaining</span>
             <span
-              className={` font-medium ${countdown <= 10 ? "text-destructive" : "text-foreground"}`}
+              className={` font-medium ${countdown <= 5 ? "text-destructive" : "text-foreground"}`}
             >
               {countdown}s
             </span>

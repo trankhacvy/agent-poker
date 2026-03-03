@@ -1,3 +1,5 @@
+import fp from "fastify-plugin";
+import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 // @ts-ignore -- bn.js lacks type declarations in this setup
@@ -5,9 +7,9 @@ import BN from "bn.js";
 import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import bs58 from "bs58";
-import type { GameStateSnapshot, PlayerSnapshot } from "./types.js";
-import gameIdl from "../idl/agent_poker_game.json";
-import agentIdl from "../idl/agent_poker_agent.json";
+import type { GameStateSnapshot, PlayerSnapshot } from "../types.js";
+import gameIdl from "../../idl/agent_poker_game.json";
+import agentIdl from "../../idl/agent_poker_agent.json";
 import {
   DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
@@ -43,7 +45,7 @@ const PHASE_VARIANT_MAP: Record<string, string> = {
   complete: "settled",
 };
 
-function deriveGamePda(gameId: BN): PublicKey {
+function deriveGamePdaInternal(gameId: BN): PublicKey {
   return PublicKey.findProgramAddressSync(
     [GAME_SEED, gameId.toArrayLike(Buffer, "le", 8)],
     PROGRAM_ID
@@ -52,7 +54,11 @@ function deriveGamePda(gameId: BN): PublicKey {
 
 function deriveHandPda(gameId: BN, seatIndex: number): PublicKey {
   return PublicKey.findProgramAddressSync(
-    [HAND_SEED, gameId.toArrayLike(Buffer, "le", 8), Buffer.from([seatIndex])],
+    [
+      HAND_SEED,
+      gameId.toArrayLike(Buffer, "le", 8),
+      Buffer.from([seatIndex]),
+    ],
     PROGRAM_ID
   )[0];
 }
@@ -68,6 +74,15 @@ function getHandAccountsMap(gameId: BN) {
   };
 }
 
+/**
+ * Convert a game/table ID string to a BN for on-chain use.
+ *
+ * Accepts two formats:
+ * 1. Pure numeric string (e.g. "1234567890") — used directly as BN.
+ * 2. UUID-like string (e.g. "550e8400-e29b-41d4-...") — dashes are stripped,
+ *    the first 16 hex chars are taken and converted to a big-endian BN.
+ *    This truncates to u64 (8 bytes), which is sufficient for on-chain PDA seeds.
+ */
 function toBn(value: string): BN {
   if (/^\d+$/.test(value)) return new BN(value);
   const hex = Buffer.from(value.replace(/-/g, "").slice(0, 16), "hex");
@@ -88,7 +103,10 @@ function getDelegationAccounts(pda: PublicKey, ownerProgram: PublicKey) {
     permDelegationMetadata:
       delegationMetadataPdaFromDelegatedAccount(permissionPda),
     bufferPlayerHand:
-      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(pda, ownerProgram),
+      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+        pda,
+        ownerProgram
+      ),
     delegationRecordPlayerHand:
       delegationRecordPdaFromDelegatedAccount(pda),
     delegationMetadataPlayerHand:
@@ -110,7 +128,10 @@ function getGameDelegationAccounts(gamePda: PublicKey) {
     permDelegationMetadata:
       delegationMetadataPdaFromDelegatedAccount(permissionPda),
     bufferGame:
-      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(gamePda, PROGRAM_ID),
+      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+        gamePda,
+        PROGRAM_ID
+      ),
     delegationRecordGame:
       delegationRecordPdaFromDelegatedAccount(gamePda),
     delegationMetadataGame:
@@ -159,33 +180,40 @@ export class SolanaClient {
   private program: Program;
   private erProgram: Program;
   private agentProgram: Program;
+  private log: FastifyBaseLogger;
 
-  /**
-   * Load a keypair from either a file path or a base58-encoded private key.
-   * If the string looks like a file path (contains / or \) and the file exists,
-   * it reads the JSON byte-array file. Otherwise it decodes as base58.
-   */
   private static loadKeypair(pathOrBase58: string): Keypair {
-    const looksLikePath = pathOrBase58.includes("/") || pathOrBase58.includes("\\") || pathOrBase58.startsWith("~");
+    const looksLikePath =
+      pathOrBase58.includes("/") ||
+      pathOrBase58.includes("\\") ||
+      pathOrBase58.startsWith("~");
     if (looksLikePath) {
-      const resolvedPath = pathOrBase58.replace("~", process.env.HOME ?? "");
+      const resolvedPath = pathOrBase58.replace(
+        "~",
+        process.env.HOME ?? ""
+      );
       const fullPath = resolve(resolvedPath);
       if (!existsSync(fullPath)) {
-        throw new Error(`Keypair file not found: ${fullPath}. Set AUTHORITY_PRIVATE_KEY (base58) for deployments without filesystem access.`);
+        throw new Error(
+          `Keypair file not found: ${fullPath}. Set AUTHORITY_PRIVATE_KEY (base58) for deployments without filesystem access.`
+        );
       }
-      const keypairData = JSON.parse(readFileSync(fullPath, "utf-8")) as number[];
+      const keypairData = JSON.parse(
+        readFileSync(fullPath, "utf-8")
+      ) as number[];
       return Keypair.fromSecretKey(Uint8Array.from(keypairData));
     }
-    // Treat as base58 private key
     return Keypair.fromSecretKey(bs58.decode(pathOrBase58));
   }
 
   constructor(
     rpcUrl: string,
     keypairPathOrBase58: string,
-    erEndpoint: string = "https://devnet.magicblock.app/",
-    erWsEndpoint: string = "wss://devnet.magicblock.app/"
+    erEndpoint: string,
+    erWsEndpoint: string,
+    log: FastifyBaseLogger
   ) {
+    this.log = log;
     this.connection = new Connection(rpcUrl, "confirmed");
     this.authority = SolanaClient.loadKeypair(keypairPathOrBase58);
 
@@ -207,7 +235,7 @@ export class SolanaClient {
   }
 
   deriveGamePda(gameId: string): PublicKey {
-    return deriveGamePda(toBn(gameId));
+    return deriveGamePdaInternal(toBn(gameId));
   }
 
   async createGame(
@@ -217,7 +245,7 @@ export class SolanaClient {
   ): Promise<string> {
     const gameIdBn = toBn(gameId);
     const tableIdBn = toBn(tableId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
 
     const tx = await (this.program.methods as any)
       .createGame(gameIdBn, tableIdBn, new BN(wagerTier))
@@ -238,7 +266,7 @@ export class SolanaClient {
     playerPubkey: string
   ): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
     const handPda = deriveHandPda(gameIdBn, seatIndex);
     const delegAccounts = getDelegationAccounts(handPda, PROGRAM_ID);
     const playerKey = new PublicKey(playerPubkey);
@@ -259,8 +287,10 @@ export class SolanaClient {
         ownerProgram: PROGRAM_ID,
         delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
         bufferPlayerHand: delegAccounts.bufferPlayerHand,
-        delegationRecordPlayerHand: delegAccounts.delegationRecordPlayerHand,
-        delegationMetadataPlayerHand: delegAccounts.delegationMetadataPlayerHand,
+        delegationRecordPlayerHand:
+          delegAccounts.delegationRecordPlayerHand,
+        delegationMetadataPlayerHand:
+          delegAccounts.delegationMetadataPlayerHand,
       })
       .rpc({ skipPreflight: true });
 
@@ -276,7 +306,9 @@ export class SolanaClient {
     for (let i = filledSeats; i < 6; i++) {
       const handPda = deriveHandPda(gameIdBn, i);
       await (this.program.methods as any)
-        .delegatePda({ playerHand: { gameId: gameIdBn, seatIndex: i } })
+        .delegatePda({
+          playerHand: { gameId: gameIdBn, seatIndex: i },
+        })
         .accountsPartial({
           payer: this.authority.publicKey,
           pda: handPda,
@@ -288,7 +320,7 @@ export class SolanaClient {
 
   async startGame(gameId: string): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
     const delegAccounts = getGameDelegationAccounts(gamePda);
 
     const tx = await (this.program.methods as any)
@@ -323,15 +355,19 @@ export class SolanaClient {
       try {
         const info = await this.erConnection.getAccountInfo(pda);
         if (info) return;
-      } catch {}
+      } catch (err) {
+        this.log.debug({ err }, "ER account poll error");
+      }
       await new Promise((r) => setTimeout(r, 2000));
     }
-    throw new Error(`Account ${pda.toBase58()} not found on ER within ${timeoutMs}ms`);
+    throw new Error(
+      `Account ${pda.toBase58()} not found on ER within ${timeoutMs}ms`
+    );
   }
 
   async requestShuffle(gameId: string): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
 
     const tx = await (this.erProgram.methods as any)
       .requestShuffle(0)
@@ -351,20 +387,26 @@ export class SolanaClient {
     timeoutMs: number = 120_000
   ): Promise<GameStateSnapshot> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const account = await (this.erProgram.account as any).gameState.fetch(gamePda);
+        const account = await (
+          this.erProgram.account as any
+        ).gameState.fetch(gamePda);
         const phase = JSON.stringify(account.phase);
         if (phase !== JSON.stringify({ waiting: {} })) {
           return parseGameAccount(account);
         }
-      } catch {}
+      } catch (err) {
+        this.log.debug({ err }, "VRF poll error");
+      }
     }
-    throw new Error(`VRF callback did not complete within ${timeoutMs}ms`);
+    throw new Error(
+      `VRF callback did not complete within ${timeoutMs}ms`
+    );
   }
 
   async playerAction(
@@ -373,7 +415,7 @@ export class SolanaClient {
     raiseAmount: number
   ): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
 
     const tx = await (this.erProgram.methods as any)
       .playerAction(action, new BN(raiseAmount))
@@ -388,7 +430,7 @@ export class SolanaClient {
 
   async showdownTest(gameId: string): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
 
     const tx = await (this.erProgram.methods as any)
       .showdownTest()
@@ -404,7 +446,7 @@ export class SolanaClient {
 
   async commitGame(gameId: string): Promise<string> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
 
     const tx = await (this.erProgram.methods as any)
       .commitGame()
@@ -423,11 +465,14 @@ export class SolanaClient {
   ): Promise<GameStateSnapshot | null> {
     try {
       const gameIdBn = toBn(gameId);
-      const gamePda = deriveGamePda(gameIdBn);
+      const gamePda = deriveGamePdaInternal(gameIdBn);
       const program = fromEr ? this.erProgram : this.program;
-      const account = await (program.account as any).gameState.fetch(gamePda);
+      const account = await (
+        program.account as any
+      ).gameState.fetch(gamePda);
       return parseGameAccount(account);
-    } catch {
+    } catch (err) {
+      this.log.debug({ err }, "Failed to fetch game state");
       return null;
     }
   }
@@ -441,9 +486,12 @@ export class SolanaClient {
       const gameIdBn = toBn(gameId);
       const handPda = deriveHandPda(gameIdBn, seatIndex);
       const program = fromEr ? this.erProgram : this.program;
-      const account = await (program.account as any).playerHand.fetch(handPda);
+      const account = await (
+        program.account as any
+      ).playerHand.fetch(handPda);
       return { hand: Array.from(account.hand) };
-    } catch {
+    } catch (err) {
+      this.log.debug({ err }, "Failed to fetch player hand");
       return null;
     }
   }
@@ -453,18 +501,22 @@ export class SolanaClient {
     timeoutMs: number = 120_000
   ): Promise<GameStateSnapshot | null> {
     const gameIdBn = toBn(gameId);
-    const gamePda = deriveGamePda(gameIdBn);
+    const gamePda = deriveGamePdaInternal(gameIdBn);
     const start = Date.now();
 
     while (Date.now() - start < timeoutMs) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const account = await (this.program.account as any).gameState.fetch(gamePda);
+        const account = await (
+          this.program.account as any
+        ).gameState.fetch(gamePda);
         const phase = JSON.stringify(account.phase);
         if (phase === JSON.stringify({ complete: {} })) {
           return parseGameAccount(account);
         }
-      } catch {}
+      } catch (err) {
+        this.log.debug({ err }, "Base layer settle poll error");
+      }
     }
     return null;
   }
@@ -499,3 +551,29 @@ export class SolanaClient {
     return tx;
   }
 }
+
+declare module "fastify" {
+  interface FastifyInstance {
+    solanaWrite: SolanaClient;
+  }
+}
+
+export default fp(
+  async (fastify: FastifyInstance) => {
+    const keypathOrKey =
+      fastify.env.AUTHORITY_PRIVATE_KEY ??
+      fastify.env.AUTHORITY_KEYPAIR_PATH ??
+      "~/.config/solana/id.json";
+
+    const client = new SolanaClient(
+      fastify.env.SOLANA_RPC_URL,
+      keypathOrKey,
+      fastify.env.EPHEMERAL_PROVIDER_ENDPOINT,
+      fastify.env.EPHEMERAL_WS_ENDPOINT,
+      fastify.log
+    );
+    fastify.decorate("solanaWrite", client);
+    fastify.log.info("Solana write plugin loaded");
+  },
+  { name: "solana-write", dependencies: ["env"] }
+);
