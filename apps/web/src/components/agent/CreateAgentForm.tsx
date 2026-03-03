@@ -29,9 +29,7 @@ export default function CreateAgentForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-lg text-foreground">
-          Create New Agent
-        </CardTitle>
+        <CardTitle className="text-lg text-foreground">Create New Agent</CardTitle>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-5">
@@ -49,15 +47,10 @@ export default function CreateAgentForm() {
                 onClick={() => setSelectedTemplate(template.id)}
               >
                 <span className="text-3xl">{templateEmojis[template.id]}</span>
-                <span
-                  className="text-sm font-semibold"
-                  style={{ color: template.color }}
-                >
+                <span className="text-sm font-semibold" style={{ color: template.color }}>
                   {template.name}
                 </span>
-                <span className="text-xs text-muted-foreground">
-                  {template.description}
-                </span>
+                <span className="text-xs text-muted-foreground">{template.description}</span>
               </button>
             ))}
           </div>
@@ -82,7 +75,7 @@ export default function CreateAgentForm() {
         ) : (
           <Button
             onClick={handleCreate}
-            loading={loading}
+            // loading={loading}
             disabled={!displayName.trim()}
           >
             Create Agent

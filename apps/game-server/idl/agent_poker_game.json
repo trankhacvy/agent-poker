@@ -1,0 +1,1878 @@
+{
+  "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr",
+  "metadata": {
+    "name": "agent_poker_game",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "AgentPoker - Game engine and logic"
+  },
+  "instructions": [
+    {
+      "name": "callback_shuffle",
+      "docs": [
+        "Called by the VRF oracle. Shuffles the deck, deals hole cards into the",
+        "`PlayerHand` PDAs, sets community cards, and posts blinds."
+      ],
+      "discriminator": [
+        61,
+        96,
+        191,
+        76,
+        226,
+        182,
+        70,
+        95
+      ],
+      "accounts": [
+        {
+          "name": "vrf_program_identity",
+          "docs": [
+            "SECURITY: Must be signed by the VRF program to prevent spoofed callbacks"
+          ],
+          "signer": true,
+          "address": "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw"
+        },
+        {
+          "name": "game",
+          "writable": true
+        },
+        {
+          "name": "hand0",
+          "writable": true
+        },
+        {
+          "name": "hand1",
+          "writable": true
+        },
+        {
+          "name": "hand2",
+          "writable": true
+        },
+        {
+          "name": "hand3",
+          "writable": true
+        },
+        {
+          "name": "hand4",
+          "writable": true
+        },
+        {
+          "name": "hand5",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "randomness",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "commit_game",
+      "docs": [
+        "Commits the GameState back to the base layer and undelegates it.",
+        "Can be used after showdown_test or any time the game should return to L1."
+      ],
+      "discriminator": [
+        212,
+        148,
+        56,
+        92,
+        60,
+        28,
+        179,
+        66
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_game",
+      "docs": [
+        "Creates GameState and all 6 PlayerHand PDAs on L1. No players yet —",
+        "they join via `join_game`. All 6 hands are created upfront because the",
+        "VRF callback writes to all 6 fixed hand slots."
+      ],
+      "discriminator": [
+        124,
+        69,
+        75,
+        66,
+        184,
+        220,
+        72,
+        206
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hand0",
+          "writable": true
+        },
+        {
+          "name": "hand1",
+          "writable": true
+        },
+        {
+          "name": "hand2",
+          "writable": true
+        },
+        {
+          "name": "hand3",
+          "writable": true
+        },
+        {
+          "name": "hand4",
+          "writable": true
+        },
+        {
+          "name": "hand5",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        },
+        {
+          "name": "table_id",
+          "type": "u64"
+        },
+        {
+          "name": "wager_tier",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "create_game_test",
+      "docs": [
+        "Old-style game creation that initialises GameState and all 6 PlayerHand",
+        "PDAs in a single instruction. NOT for production ER flow."
+      ],
+      "discriminator": [
+        122,
+        33,
+        111,
+        133,
+        115,
+        181,
+        244,
+        148
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hand0",
+          "writable": true
+        },
+        {
+          "name": "hand1",
+          "writable": true
+        },
+        {
+          "name": "hand2",
+          "writable": true
+        },
+        {
+          "name": "hand3",
+          "writable": true
+        },
+        {
+          "name": "hand4",
+          "writable": true
+        },
+        {
+          "name": "hand5",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        },
+        {
+          "name": "table_id",
+          "type": "u64"
+        },
+        {
+          "name": "players",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "wager_tier",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "create_permission",
+      "docs": [
+        "Creates a TEE permission entry for `GameState` or `PlayerHand` PDAs,",
+        "restricting read access on the ephemeral rollup."
+      ],
+      "discriminator": [
+        190,
+        182,
+        26,
+        164,
+        156,
+        221,
+        8,
+        0
+      ],
+      "accounts": [
+        {
+          "name": "permissioned_account"
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_type",
+          "type": {
+            "defined": {
+              "name": "AccountType"
+            }
+          }
+        },
+        {
+          "name": "members",
+          "type": {
+            "option": {
+              "vec": {
+                "defined": {
+                  "name": "Member"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "deal_cards",
+      "docs": [
+        "Simulates what callback_shuffle does, using a pre-shuffled deck",
+        "provided by the caller. NOT for production use."
+      ],
+      "discriminator": [
+        38,
+        218,
+        247,
+        103,
+        218,
+        237,
+        24,
+        65
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "game"
+          ]
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hand0",
+          "writable": true
+        },
+        {
+          "name": "hand1",
+          "writable": true
+        },
+        {
+          "name": "hand2",
+          "writable": true
+        },
+        {
+          "name": "hand3",
+          "writable": true
+        },
+        {
+          "name": "hand4",
+          "writable": true
+        },
+        {
+          "name": "hand5",
+          "writable": true
+        }
+      ],
+      "args": [
+        {
+          "name": "deck",
+          "type": "bytes"
+        }
+      ]
+    },
+    {
+      "name": "delegate_pda",
+      "docs": [
+        "Generic delegation instruction — delegates either the `GameState` or a",
+        "`PlayerHand` PDA to MagicBlock's TEE validator."
+      ],
+      "discriminator": [
+        248,
+        217,
+        193,
+        46,
+        124,
+        191,
+        64,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "buffer_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                53,
+                255,
+                182,
+                6,
+                86,
+                36,
+                253,
+                15,
+                222,
+                100,
+                151,
+                235,
+                88,
+                8,
+                38,
+                135,
+                76,
+                124,
+                153,
+                5,
+                221,
+                88,
+                43,
+                134,
+                30,
+                14,
+                96,
+                136,
+                45,
+                95,
+                141,
+                41
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_pda",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pda"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "pda",
+          "writable": true
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "validator",
+          "optional": true
+        },
+        {
+          "name": "owner_program",
+          "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_type",
+          "type": {
+            "defined": {
+              "name": "AccountType"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "join_game",
+      "docs": [
+        "Called on L1 per player. Assigns the player to a seat, creates and",
+        "delegates a TEE permission for the hand PDA, then delegates it to ER."
+      ],
+      "discriminator": [
+        107,
+        112,
+        18,
+        38,
+        56,
+        173,
+        60,
+        128
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "buffer_player_hand",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_hand"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                53,
+                255,
+                182,
+                6,
+                86,
+                36,
+                253,
+                15,
+                222,
+                100,
+                151,
+                235,
+                88,
+                8,
+                38,
+                135,
+                76,
+                124,
+                153,
+                5,
+                221,
+                88,
+                43,
+                134,
+                30,
+                14,
+                96,
+                136,
+                45,
+                95,
+                141,
+                41
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_player_hand",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_hand"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_player_hand",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_hand"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "player_hand",
+          "writable": true
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_buffer",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_record",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_metadata",
+          "writable": true
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "owner_program",
+          "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        },
+        {
+          "name": "seat_index",
+          "type": "u8"
+        },
+        {
+          "name": "player",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "player_action",
+      "discriminator": [
+        37,
+        85,
+        25,
+        135,
+        200,
+        116,
+        96,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "game"
+          ]
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "action",
+          "type": "u8"
+        },
+        {
+          "name": "raise_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "process_undelegation",
+      "discriminator": [
+        196,
+        28,
+        41,
+        206,
+        48,
+        37,
+        51,
+        167
+      ],
+      "accounts": [
+        {
+          "name": "base_account",
+          "writable": true
+        },
+        {
+          "name": "buffer"
+        },
+        {
+          "name": "payer",
+          "writable": true
+        },
+        {
+          "name": "system_program"
+        }
+      ],
+      "args": [
+        {
+          "name": "account_seeds",
+          "type": {
+            "vec": "bytes"
+          }
+        }
+      ]
+    },
+    {
+      "name": "request_shuffle",
+      "docs": [
+        "Submitted on the ER after delegation. Triggers a VRF randomness request;",
+        "the oracle will call `callback_shuffle` with the randomness."
+      ],
+      "discriminator": [
+        130,
+        20,
+        53,
+        22,
+        23,
+        102,
+        225,
+        135
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "game"
+          ]
+        },
+        {
+          "name": "oracle_queue",
+          "writable": true,
+          "address": "5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc"
+        },
+        {
+          "name": "hand0"
+        },
+        {
+          "name": "hand1"
+        },
+        {
+          "name": "hand2"
+        },
+        {
+          "name": "hand3"
+        },
+        {
+          "name": "hand4"
+        },
+        {
+          "name": "hand5"
+        },
+        {
+          "name": "program_identity",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  105,
+                  100,
+                  101,
+                  110,
+                  116,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "vrf_program",
+          "address": "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz"
+        },
+        {
+          "name": "slot_hashes",
+          "address": "SysvarS1otHashes111111111111111111111111111"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "client_seed",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "showdown",
+      "docs": [
+        "Called on the ER after all betting is done. Removes TEE restrictions on",
+        "all `PlayerHand` PDAs (making hands visible), evaluates the winner, and",
+        "commits + undelegates the `GameState` back to L1."
+      ],
+      "discriminator": [
+        42,
+        62,
+        227,
+        166,
+        247,
+        144,
+        182,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hand0",
+          "writable": true
+        },
+        {
+          "name": "hand1",
+          "writable": true
+        },
+        {
+          "name": "hand2",
+          "writable": true
+        },
+        {
+          "name": "hand3",
+          "writable": true
+        },
+        {
+          "name": "hand4",
+          "writable": true
+        },
+        {
+          "name": "hand5",
+          "writable": true
+        },
+        {
+          "name": "permission_hand0",
+          "writable": true
+        },
+        {
+          "name": "permission_hand1",
+          "writable": true
+        },
+        {
+          "name": "permission_hand2",
+          "writable": true
+        },
+        {
+          "name": "permission_hand3",
+          "writable": true
+        },
+        {
+          "name": "permission_hand4",
+          "writable": true
+        },
+        {
+          "name": "permission_hand5",
+          "writable": true
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "magic_program",
+          "address": "Magic11111111111111111111111111111111111111"
+        },
+        {
+          "name": "magic_context",
+          "writable": true,
+          "address": "MagicContext1111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "showdown_test",
+      "docs": [
+        "Evaluates winner without updating TEE permissions or committing."
+      ],
+      "discriminator": [
+        53,
+        72,
+        132,
+        171,
+        97,
+        89,
+        75,
+        159
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game.game_id",
+                "account": "GameState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hand0"
+        },
+        {
+          "name": "hand1"
+        },
+        {
+          "name": "hand2"
+        },
+        {
+          "name": "hand3"
+        },
+        {
+          "name": "hand4"
+        },
+        {
+          "name": "hand5"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_game",
+      "docs": [
+        "Called on L1 when enough players have joined. Creates and delegates a TEE",
+        "permission for the GameState PDA, then delegates it to the ER."
+      ],
+      "discriminator": [
+        249,
+        47,
+        252,
+        172,
+        184,
+        162,
+        245,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buffer_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  117,
+                  102,
+                  102,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                53,
+                255,
+                182,
+                6,
+                86,
+                36,
+                253,
+                15,
+                222,
+                100,
+                151,
+                235,
+                88,
+                8,
+                38,
+                135,
+                76,
+                124,
+                153,
+                5,
+                221,
+                88,
+                43,
+                134,
+                30,
+                14,
+                96,
+                136,
+                45,
+                95,
+                141,
+                41
+              ]
+            }
+          }
+        },
+        {
+          "name": "delegation_record_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "delegation_metadata_game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  101,
+                  108,
+                  101,
+                  103,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  100,
+                  97,
+                  116,
+                  97
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "game"
+              }
+            ],
+            "program": {
+              "kind": "account",
+              "path": "delegation_program"
+            }
+          }
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "permission",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_buffer",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_record",
+          "writable": true
+        },
+        {
+          "name": "perm_delegation_metadata",
+          "writable": true
+        },
+        {
+          "name": "validator"
+        },
+        {
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "owner_program",
+          "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr"
+        },
+        {
+          "name": "delegation_program",
+          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "GameState",
+      "discriminator": [
+        144,
+        94,
+        208,
+        172,
+        248,
+        99,
+        134,
+        120
+      ]
+    },
+    {
+      "name": "PlayerHand",
+      "discriminator": [
+        16,
+        240,
+        39,
+        61,
+        10,
+        73,
+        250,
+        160
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "GameFinished",
+      "discriminator": [
+        0,
+        128,
+        235,
+        237,
+        115,
+        180,
+        62,
+        221
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidPlayerCount",
+      "msg": "Invalid player count (must be 2-6)"
+    },
+    {
+      "code": 6001,
+      "name": "InvalidPhase",
+      "msg": "Invalid game phase for this action"
+    },
+    {
+      "code": 6002,
+      "name": "PlayerNotActive",
+      "msg": "Player is not active"
+    },
+    {
+      "code": 6003,
+      "name": "CannotCheck",
+      "msg": "Cannot check when there is an outstanding bet"
+    },
+    {
+      "code": 6004,
+      "name": "RaiseTooSmall",
+      "msg": "Raise must be greater than current bet"
+    },
+    {
+      "code": 6005,
+      "name": "InvalidAction",
+      "msg": "Invalid action type"
+    },
+    {
+      "code": 6006,
+      "name": "MathOverflow",
+      "msg": "Math overflow"
+    },
+    {
+      "code": 6007,
+      "name": "Unauthorized",
+      "msg": "Unauthorized"
+    },
+    {
+      "code": 6008,
+      "name": "InvalidDeck",
+      "msg": "Deck must be exactly 52 cards"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidSeatIndex",
+      "msg": "Invalid seat index"
+    },
+    {
+      "code": 6010,
+      "name": "SeatTaken",
+      "msg": "Seat is already taken"
+    }
+  ],
+  "types": [
+    {
+      "name": "AccountType",
+      "docs": [
+        "Enum used to identify account types for delegation and permission CPIs."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Game",
+            "fields": [
+              {
+                "name": "game_id",
+                "type": "u64"
+              }
+            ]
+          },
+          {
+            "name": "PlayerHand",
+            "fields": [
+              {
+                "name": "game_id",
+                "type": "u64"
+              },
+              {
+                "name": "seat_index",
+                "type": "u8"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameFinished",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "winner_index",
+            "type": "u8"
+          },
+          {
+            "name": "winner_pubkey",
+            "type": "pubkey"
+          },
+          {
+            "name": "pot",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GamePhase",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Waiting"
+          },
+          {
+            "name": "Preflop"
+          },
+          {
+            "name": "Flop"
+          },
+          {
+            "name": "Turn"
+          },
+          {
+            "name": "River"
+          },
+          {
+            "name": "Showdown"
+          },
+          {
+            "name": "Complete"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "table_id",
+            "type": "u64"
+          },
+          {
+            "name": "player_count",
+            "type": "u8"
+          },
+          {
+            "name": "wager_tier",
+            "type": "u64"
+          },
+          {
+            "name": "phase",
+            "type": {
+              "defined": {
+                "name": "GamePhase"
+              }
+            }
+          },
+          {
+            "name": "pot",
+            "type": "u64"
+          },
+          {
+            "name": "current_bet",
+            "type": "u64"
+          },
+          {
+            "name": "dealer_index",
+            "type": "u8"
+          },
+          {
+            "name": "current_player",
+            "type": "u8"
+          },
+          {
+            "name": "last_raiser",
+            "type": "u8"
+          },
+          {
+            "name": "deck",
+            "docs": [
+              "Ordered deck after VRF shuffle — community cards live at indices 12-16."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                52
+              ]
+            }
+          },
+          {
+            "name": "players",
+            "type": {
+              "array": [
+                "pubkey",
+                6
+              ]
+            }
+          },
+          {
+            "name": "player_status",
+            "type": {
+              "array": [
+                "u8",
+                6
+              ]
+            }
+          },
+          {
+            "name": "player_bets",
+            "type": {
+              "array": [
+                "u64",
+                6
+              ]
+            }
+          },
+          {
+            "name": "community_cards",
+            "type": {
+              "array": [
+                "u8",
+                5
+              ]
+            }
+          },
+          {
+            "name": "community_count",
+            "type": "u8"
+          },
+          {
+            "name": "winner_index",
+            "type": "u8"
+          },
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "last_action_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Member",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "flags",
+            "type": "u8"
+          },
+          {
+            "name": "pubkey",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerHand",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "game_id",
+            "type": "u64"
+          },
+          {
+            "name": "player",
+            "type": "pubkey"
+          },
+          {
+            "name": "hand",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

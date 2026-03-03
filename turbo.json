@@ -8,12 +8,40 @@
     },
     "dev": {
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "PORT",
+        "GAME_SERVER_PORT",
+        "LLM_PROVIDER",
+        "GOOGLE_GENERATIVE_AI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "SOLANA_RPC_URL",
+        "AUTHORITY_KEYPAIR_PATH",
+        "AUTHORITY_PRIVATE_KEY",
+        "EPHEMERAL_PROVIDER_ENDPOINT",
+        "EPHEMERAL_WS_ENDPOINT",
+        "AUTO_MATCH_ENABLED",
+        "AUTO_MATCH_INTERVAL_MS"
+      ]
     },
     "start": {
       "dependsOn": ["build"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "passThroughEnv": [
+        "PORT",
+        "GAME_SERVER_PORT",
+        "LLM_PROVIDER",
+        "GOOGLE_GENERATIVE_AI_API_KEY",
+        "OPENROUTER_API_KEY",
+        "SOLANA_RPC_URL",
+        "AUTHORITY_KEYPAIR_PATH",
+        "AUTHORITY_PRIVATE_KEY",
+        "EPHEMERAL_PROVIDER_ENDPOINT",
+        "EPHEMERAL_WS_ENDPOINT",
+        "AUTO_MATCH_ENABLED",
+        "AUTO_MATCH_INTERVAL_MS"
+      ]
     },
     "lint": {
       "outputs": []

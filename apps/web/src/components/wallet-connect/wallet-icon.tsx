@@ -3,6 +3,7 @@
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
+// @ts-ignore
 export interface WalletIconProps extends React.ComponentProps<typeof Avatar> {
   name?: string;
   icon?: string;

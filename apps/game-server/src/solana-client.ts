@@ -2,11 +2,12 @@ import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
 import { AnchorProvider, Program, Wallet } from "@coral-xyz/anchor";
 // @ts-ignore -- bn.js lacks type declarations in this setup
 import BN from "bn.js";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
+import bs58 from "bs58";
 import type { GameStateSnapshot, PlayerSnapshot } from "./types.js";
-import gameIdl from "../../../target/idl/agent_poker_game.json";
-import agentIdl from "../../../target/idl/agent_poker_agent.json";
+import gameIdl from "../idl/agent_poker_game.json";
+import agentIdl from "../idl/agent_poker_agent.json";
 import {
   DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
@@ -159,18 +160,34 @@ export class SolanaClient {
   private erProgram: Program;
   private agentProgram: Program;
 
+  /**
+   * Load a keypair from either a file path or a base58-encoded private key.
+   * If the string looks like a file path (contains / or \) and the file exists,
+   * it reads the JSON byte-array file. Otherwise it decodes as base58.
+   */
+  private static loadKeypair(pathOrBase58: string): Keypair {
+    const looksLikePath = pathOrBase58.includes("/") || pathOrBase58.includes("\\") || pathOrBase58.startsWith("~");
+    if (looksLikePath) {
+      const resolvedPath = pathOrBase58.replace("~", process.env.HOME ?? "");
+      const fullPath = resolve(resolvedPath);
+      if (!existsSync(fullPath)) {
+        throw new Error(`Keypair file not found: ${fullPath}. Set AUTHORITY_PRIVATE_KEY (base58) for deployments without filesystem access.`);
+      }
+      const keypairData = JSON.parse(readFileSync(fullPath, "utf-8")) as number[];
+      return Keypair.fromSecretKey(Uint8Array.from(keypairData));
+    }
+    // Treat as base58 private key
+    return Keypair.fromSecretKey(bs58.decode(pathOrBase58));
+  }
+
   constructor(
     rpcUrl: string,
-    keypairPath: string,
+    keypairPathOrBase58: string,
     erEndpoint: string = "https://devnet.magicblock.app/",
     erWsEndpoint: string = "wss://devnet.magicblock.app/"
   ) {
     this.connection = new Connection(rpcUrl, "confirmed");
-    const resolvedPath = keypairPath.replace("~", process.env.HOME ?? "");
-    const keypairData = JSON.parse(
-      readFileSync(resolve(resolvedPath), "utf-8")
-    ) as number[];
-    this.authority = Keypair.fromSecretKey(Uint8Array.from(keypairData));
+    this.authority = SolanaClient.loadKeypair(keypairPathOrBase58);
 
     const wallet = new Wallet(this.authority);
     const provider = new AnchorProvider(this.connection, wallet, {

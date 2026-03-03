@@ -83,9 +83,7 @@ export default function AgentsPage() {
           {agents.length === 0 ? (
             <div className="flex flex-col items-center border-2 border-dashed border-border bg-card p-12 text-center">
               <span className="mb-3 text-4xl">{"\u{1F916}"}</span>
-              <p className="text-muted-foreground">
-                No agents yet. Create your first one!
-              </p>
+              <p className="text-muted-foreground">No agents yet. Create your first one!</p>
             </div>
           ) : (
             <div className="flex flex-col gap-4">
@@ -97,27 +95,22 @@ export default function AgentsPage() {
 
                 return (
                   <div key={agent.publicKey} className="flex flex-col gap-3">
-                    <AgentCard
-                      agent={agent}
-                      onFund={handleFund}
-                      onWithdraw={handleWithdraw}
-                    />
+                    <AgentCard agent={agent} onFund={handleFund} onWithdraw={handleWithdraw} />
 
                     <div className="border-2 border-border bg-card p-3">
                       {isQueued ? (
                         <div className="flex items-center gap-2">
                           <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
                           <span className="text-sm text-primary">
-                            Queued! Waiting for players... ({queueStatus.playerCount}/{queueStatus.maxPlayers})
+                            Queued! Waiting for players... ({queueStatus.playerCount}/
+                            {queueStatus.maxPlayers})
                           </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
                           <Select
                             value={String(tierIndex)}
-                            onValueChange={(val) =>
-                              handleTierChange(agent.publicKey, val)
-                            }
+                            onValueChange={(val) => handleTierChange(agent.publicKey, val)}
                           >
                             <SelectTrigger className="w-[160px] border-border bg-muted">
                               <SelectValue />
@@ -133,7 +126,7 @@ export default function AgentsPage() {
                           <Button
                             size="sm"
                             className="flex-1"
-                            loading={isLoading}
+                            // loading={isLoading}
                             onClick={() => handleQueueForGame(agent)}
                           >
                             Queue for Game

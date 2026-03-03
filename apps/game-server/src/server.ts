@@ -18,12 +18,15 @@ import {
   decrementActiveGames,
 } from "./routes/game-history.js";
 
-const PORT = parseInt(process.env.GAME_SERVER_PORT ?? "3001", 10);
+const PORT = parseInt(process.env.PORT ?? process.env.GAME_SERVER_PORT ?? "3001", 10);
 const LLM_PROVIDER = (process.env.LLM_PROVIDER ?? "gemini") as LlmProvider;
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-const AUTHORITY_KEYPAIR_PATH = process.env.AUTHORITY_KEYPAIR_PATH ?? "~/.config/solana/id.json";
+const AUTHORITY_KEY =
+  process.env.AUTHORITY_PRIVATE_KEY ??
+  process.env.AUTHORITY_KEYPAIR_PATH ??
+  "~/.config/solana/id.json";
 const EPHEMERAL_PROVIDER_ENDPOINT =
   process.env.EPHEMERAL_PROVIDER_ENDPOINT ?? "https://devnet.magicblock.app/";
 const EPHEMERAL_WS_ENDPOINT = process.env.EPHEMERAL_WS_ENDPOINT ?? "wss://devnet.magicblock.app/";
@@ -32,7 +35,7 @@ const fastify = Fastify({ logger: true });
 
 const solanaClient = new SolanaClient(
   SOLANA_RPC_URL,
-  AUTHORITY_KEYPAIR_PATH,
+  AUTHORITY_KEY,
   EPHEMERAL_PROVIDER_ENDPOINT,
   EPHEMERAL_WS_ENDPOINT
 );
@@ -51,6 +54,8 @@ async function start(): Promise<void> {
   await fastify.register(fastifyWebsocket);
 
   wsFeed.registerRoutes(fastify);
+
+  fastify.get("/health", async () => ({ status: "ok" }));
 
   registerTableRoutes(fastify, matchmaker);
   registerAgentRoutes(fastify, reader);
