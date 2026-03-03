@@ -1,17 +1,14 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { LazyMotion, domAnimation, m } from "motion/react";
 import type { AgentData } from "@/lib/types";
 import { TEMPLATES } from "@/lib/constants";
+import { fetchAgent, fetchAgentGames, type GameHistoryRecord } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -23,103 +20,32 @@ import {
 
 const templateEmojis = ["\u{1F988}", "\u{1F525}", "\u{1FAA8}", "\u{1F98A}"];
 
-interface RecentGame {
-  tableId: string;
-  result: "win" | "loss";
-  earnings: number;
-  date: number;
-  opponents: number;
-}
-
-const mockAgent: AgentData = {
-  publicKey: "L1",
-  owner: "O1",
-  displayName: "AlphaShark",
-  templateId: 0,
-  balance: 12.5,
-  gamesPlayed: 284,
-  wins: 142,
-  earnings: 45.8,
-  createdAt: Date.now() - 86400000 * 30,
-};
-
-const mockRecentGames: RecentGame[] = [
-  {
-    tableId: "table-101",
-    result: "win",
-    earnings: 2.4,
-    date: Date.now() - 3600000,
-    opponents: 5,
-  },
-  {
-    tableId: "table-098",
-    result: "loss",
-    earnings: -0.5,
-    date: Date.now() - 7200000,
-    opponents: 4,
-  },
-  {
-    tableId: "table-095",
-    result: "win",
-    earnings: 1.8,
-    date: Date.now() - 14400000,
-    opponents: 6,
-  },
-  {
-    tableId: "table-090",
-    result: "win",
-    earnings: 3.1,
-    date: Date.now() - 28800000,
-    opponents: 5,
-  },
-  {
-    tableId: "table-087",
-    result: "loss",
-    earnings: -0.5,
-    date: Date.now() - 43200000,
-    opponents: 4,
-  },
-  {
-    tableId: "table-082",
-    result: "loss",
-    earnings: -0.5,
-    date: Date.now() - 86400000,
-    opponents: 6,
-  },
-  {
-    tableId: "table-078",
-    result: "win",
-    earnings: 1.2,
-    date: Date.now() - 172800000,
-    opponents: 5,
-  },
-  {
-    tableId: "table-074",
-    result: "win",
-    earnings: 4.0,
-    date: Date.now() - 259200000,
-    opponents: 6,
-  },
-];
-
 interface AgentProfilePageProps {
   params: Promise<{ pubkey: string }>;
 }
 
 export default function AgentProfilePage({ params }: AgentProfilePageProps) {
   const { pubkey } = use(params);
-  const [agent] = useState<AgentData>(mockAgent);
-  const [recentGames] = useState<RecentGame[]>(mockRecentGames);
+  const [agent, setAgent] = useState<AgentData | null>(null);
+  const [recentGames, setRecentGames] = useState<GameHistoryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const template = TEMPLATES[agent.templateId];
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([fetchAgent(pubkey), fetchAgentGames(pubkey, 0, 20)]).then(
+      ([agentData, gamesData]) => {
+        setAgent(agentData);
+        setRecentGames(gamesData.games);
+        setLoading(false);
+      }
+    );
+  }, [pubkey]);
+
+  const template = agent ? TEMPLATES[agent.templateId] : TEMPLATES[0];
   const winRate =
-    agent.gamesPlayed > 0
-      ? ((agent.wins / agent.gamesPlayed) * 100).toFixed(1)
-      : "0";
+    agent && agent.gamesPlayed > 0 ? ((agent.wins / agent.gamesPlayed) * 100).toFixed(1) : "0";
   const avgEarnings =
-    agent.gamesPlayed > 0
-      ? (agent.earnings / agent.gamesPlayed).toFixed(3)
-      : "0";
+    agent && agent.gamesPlayed > 0 ? (agent.earnings / agent.gamesPlayed).toFixed(3) : "0";
 
   function formatTimeAgo(timestamp: number): string {
     const diff = Date.now() - timestamp;
@@ -130,13 +56,53 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
     return `${days}d ago`;
   }
 
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <Link
+            href="/leaderboard"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {"\u2190"} Back to Leaderboard
+          </Link>
+        </div>
+        <div className="flex flex-col items-center gap-4 py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted-foreground border-t-primary" />
+          <span className="text-muted-foreground">Loading agent profile...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!agent) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <div className="mb-6">
+          <Link
+            href="/leaderboard"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {"\u2190"} Back to Leaderboard
+          </Link>
+        </div>
+        <div className="flex flex-col items-center gap-2 py-20">
+          <span className="text-lg font-medium text-muted-foreground">Agent not found</span>
+          <span className="text-sm text-muted-foreground">
+            No agent exists with this public key.
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <LazyMotion features={domAnimation}>
       <div className="mx-auto max-w-4xl px-4 py-8">
         <div className="mb-6">
           <Link
             href="/leaderboard"
-            className="text-sm text-zinc-500 transition-colors hover:text-zinc-300"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
             {"\u2190"} Back to Leaderboard
           </Link>
@@ -147,7 +113,7 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
         >
-          <Card className="mb-8 bg-zinc-900/60">
+          <Card className="mb-8">
             <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center">
               <div
                 className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-4xl"
@@ -156,24 +122,17 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
                 {templateEmojis[agent.templateId]}
               </div>
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-zinc-100">
-                  {agent.displayName}
-                </h1>
+                <h1 className="text-2xl font-bold text-foreground">{agent.displayName}</h1>
                 <div className="mt-1 flex items-center gap-2">
-                  <span
-                    className="text-sm font-medium"
-                    style={{ color: template.color }}
-                  >
+                  <span className="text-sm font-medium" style={{ color: template.color }}>
                     {template.name}
                   </span>
-                  <span className="text-zinc-600">|</span>
-                  <span className="text-sm text-zinc-500">
-                    {template.description}
-                  </span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-sm text-muted-foreground">{template.description}</span>
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="mt-2 cursor-default font-mono text-xs text-zinc-600">
+                    <p className="mt-2 cursor-default  text-xs text-muted-foreground">
                       {pubkey.length > 16 ? `${pubkey.slice(0, 8)}...${pubkey.slice(-8)}` : pubkey}
                     </p>
                   </TooltipTrigger>
@@ -181,10 +140,10 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
                 </Tooltip>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold text-amber-400">
+                <div className="text-2xl font-bold text-secondary">
                   {agent.balance.toFixed(2)} SOL
                 </div>
-                <div className="text-xs text-zinc-500">Balance</div>
+                <div className="text-xs text-muted-foreground">Balance</div>
               </div>
             </CardContent>
           </Card>
@@ -196,34 +155,30 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
           transition={{ duration: 0.4, delay: 0.1 }}
           className="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4"
         >
-          <Card className="bg-zinc-900/50 text-center">
+          <Card className="text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-emerald-400">
-                {agent.wins}
-              </div>
-              <div className="text-xs text-zinc-500">Wins</div>
+              <div className="text-2xl font-bold text-primary">{agent.wins}</div>
+              <div className="text-xs text-muted-foreground">Wins</div>
             </CardContent>
           </Card>
-          <Card className="bg-zinc-900/50 text-center">
+          <Card className="text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-zinc-200">
-                {agent.gamesPlayed}
-              </div>
-              <div className="text-xs text-zinc-500">Games Played</div>
+              <div className="text-2xl font-bold text-foreground">{agent.gamesPlayed}</div>
+              <div className="text-xs text-muted-foreground">Games Played</div>
             </CardContent>
           </Card>
-          <Card className="bg-zinc-900/50 text-center">
+          <Card className="text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-blue-400">{winRate}%</div>
-              <div className="text-xs text-zinc-500">Win Rate</div>
+              <div className="text-2xl font-bold text-accent">{winRate}%</div>
+              <div className="text-xs text-muted-foreground">Win Rate</div>
             </CardContent>
           </Card>
-          <Card className="bg-zinc-900/50 text-center">
+          <Card className="text-center">
             <CardContent className="p-4">
-              <div className="text-2xl font-bold text-amber-400">
+              <div className="text-2xl font-bold text-secondary">
                 {agent.earnings.toFixed(1)} SOL
               </div>
-              <div className="text-xs text-zinc-500">Total Earnings</div>
+              <div className="text-xs text-muted-foreground">Total Earnings</div>
             </CardContent>
           </Card>
         </m.div>
@@ -233,37 +188,28 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.15 }}
         >
-          <Card className="mb-8 bg-zinc-900/50">
+          <Card className="mb-8">
             <CardHeader>
-              <CardTitle className="text-lg text-zinc-200">
-                Strategy Profile
-              </CardTitle>
+              <CardTitle className="text-lg text-foreground">Strategy Profile</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <div className="text-xs text-zinc-500">Template</div>
+                  <div className="text-xs text-muted-foreground">Template</div>
                   <div className="flex items-center gap-2">
                     <span>{templateEmojis[agent.templateId]}</span>
-                    <span
-                      className="font-medium"
-                      style={{ color: template.color }}
-                    >
+                    <span className="font-medium" style={{ color: template.color }}>
                       {template.name}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs text-zinc-500">Play Style</div>
-                  <div className="text-sm text-zinc-300">
-                    {template.description}
-                  </div>
+                  <div className="text-xs text-muted-foreground">Play Style</div>
+                  <div className="text-sm text-muted-foreground">{template.description}</div>
                 </div>
                 <div>
-                  <div className="text-xs text-zinc-500">Avg Earnings/Game</div>
-                  <div className="text-sm font-medium text-amber-400">
-                    {avgEarnings} SOL
-                  </div>
+                  <div className="text-xs text-muted-foreground">Avg Earnings/Game</div>
+                  <div className="text-sm font-medium text-secondary">{avgEarnings} SOL</div>
                 </div>
               </div>
             </CardContent>
@@ -275,62 +221,67 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
         >
-          <h2 className="mb-4 text-lg font-semibold text-zinc-200">
-            Recent Games
-          </h2>
-          <div className="overflow-hidden rounded-xl border border-zinc-800">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900/50">
-                  <TableHead className="text-zinc-500">Table</TableHead>
-                  <TableHead className="text-zinc-500">Result</TableHead>
-                  <TableHead className="text-zinc-500">Earnings</TableHead>
-                  <TableHead className="text-zinc-500">Opponents</TableHead>
-                  <TableHead className="text-right text-zinc-500">When</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentGames.map((game) => (
-                  <TableRow
-                    key={game.tableId}
-                    className="border-b border-zinc-800/50"
-                  >
-                    <TableCell>
-                      <Link
-                        href={`/tables/${game.tableId}`}
-                        className="font-medium text-zinc-200 transition-colors hover:text-emerald-400"
-                      >
-                        {game.tableId}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={game.result}>
-                        {game.result === "win" ? "Win" : "Loss"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`font-medium ${
-                          game.earnings >= 0
-                            ? "text-emerald-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {game.earnings >= 0 ? "+" : ""}
-                        {game.earnings.toFixed(1)} SOL
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-zinc-400">
-                      {game.opponents} players
-                    </TableCell>
-                    <TableCell className="text-right text-zinc-500">
-                      {formatTimeAgo(game.date)}
-                    </TableCell>
+          <h2 className="mb-4 text-lg font-semibold text-foreground">Recent Games</h2>
+          {recentGames.length === 0 ? (
+            <div className="border-2 border-border px-6 py-10 text-center text-muted-foreground">
+              No games played yet.
+            </div>
+          ) : (
+            <div className="overflow-hidden border-2 border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-border bg-muted hover:bg-muted">
+                    <TableHead className="text-muted-foreground">Table</TableHead>
+                    <TableHead className="text-muted-foreground">Result</TableHead>
+                    <TableHead className="text-muted-foreground">Earnings</TableHead>
+                    <TableHead className="text-muted-foreground">Players</TableHead>
+                    <TableHead className="text-right text-muted-foreground">When</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {recentGames.map((game) => {
+                    const player = game.players.find((p) => p.pubkey === pubkey);
+                    const isWinner = player?.isWinner ?? false;
+                    const earnings = isWinner ? game.pot - game.wagerTier : -game.wagerTier;
+
+                    return (
+                      <TableRow key={game.gameId} className="border-b border-border">
+                        <TableCell>
+                          <Link
+                            href={`/tables/${game.tableId}`}
+                            className="font-medium text-foreground transition-colors hover:text-primary"
+                          >
+                            {game.tableId.slice(0, 8)}...
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={isWinner ? "success" : "destructive"}>
+                            {isWinner ? "Win" : "Loss"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span
+                            className={`font-medium ${
+                              earnings >= 0 ? "text-primary" : "text-destructive"
+                            }`}
+                          >
+                            {earnings >= 0 ? "+" : ""}
+                            {earnings.toFixed(1)} SOL
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {game.players.length} players
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatTimeAgo(game.completedAt)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </m.div>
       </div>
     </LazyMotion>

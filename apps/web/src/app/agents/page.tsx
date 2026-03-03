@@ -75,15 +75,15 @@ export default function AgentsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="mb-8 text-3xl font-bold text-zinc-100">My Agents</h1>
+      <h1 className="mb-8 text-3xl font-bold text-foreground">My Agents</h1>
 
       <div className="grid gap-8 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
-          <h2 className="text-xl font-semibold text-zinc-200">Your Agents</h2>
+          <h2 className="text-xl font-semibold text-foreground">Your Agents</h2>
           {agents.length === 0 ? (
-            <div className="flex flex-col items-center rounded-xl border border-dashed border-zinc-700 bg-zinc-900/30 p-12 text-center">
+            <div className="flex flex-col items-center border-2 border-dashed border-border bg-card p-12 text-center">
               <span className="mb-3 text-4xl">{"\u{1F916}"}</span>
-              <p className="text-zinc-500">
+              <p className="text-muted-foreground">
                 No agents yet. Create your first one!
               </p>
             </div>
@@ -103,11 +103,11 @@ export default function AgentsPage() {
                       onWithdraw={handleWithdraw}
                     />
 
-                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+                    <div className="border-2 border-border bg-card p-3">
                       {isQueued ? (
                         <div className="flex items-center gap-2">
-                          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
-                          <span className="text-sm text-emerald-400">
+                          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary" />
+                          <span className="text-sm text-primary">
                             Queued! Waiting for players... ({queueStatus.playerCount}/{queueStatus.maxPlayers})
                           </span>
                         </div>
@@ -119,10 +119,10 @@ export default function AgentsPage() {
                               handleTierChange(agent.publicKey, val)
                             }
                           >
-                            <SelectTrigger className="w-[160px] border-zinc-700 bg-zinc-800">
+                            <SelectTrigger className="w-[160px] border-border bg-muted">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="border-zinc-700 bg-zinc-800">
+                            <SelectContent className="border-border bg-muted">
                               {WAGER_TIERS.map((tier, i) => (
                                 <SelectItem key={i} value={String(i)}>
                                   {tier.label}

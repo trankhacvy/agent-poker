@@ -1,25 +1,24 @@
 import { Type } from "@sinclair/typebox";
 import type { FastifyInstance } from "fastify";
-
-interface LeaderboardEntry {
-  pubkey: string;
-  displayName: string;
-  template: number;
-  wins: number;
-  gamesPlayed: number;
-}
-
-const leaderboardStore: Map<string, LeaderboardEntry> = new Map();
+import type { OnChainReader } from "../on-chain-reader.js";
 
 const LeaderboardEntrySchema = Type.Object({
   pubkey: Type.String(),
+  owner: Type.String(),
   displayName: Type.String(),
   template: Type.Number(),
-  wins: Type.Number(),
+  vault: Type.String(),
+  balance: Type.Number(),
   gamesPlayed: Type.Number(),
+  wins: Type.Number(),
+  earnings: Type.Number(),
+  createdAt: Type.Number(),
 });
 
-export function registerLeaderboardRoutes(fastify: FastifyInstance): void {
+export function registerLeaderboardRoutes(
+  fastify: FastifyInstance,
+  reader: OnChainReader
+): void {
   fastify.get(
     "/api/leaderboard",
     {
@@ -32,27 +31,8 @@ export function registerLeaderboardRoutes(fastify: FastifyInstance): void {
       },
     },
     async () => {
-      const entries = Array.from(leaderboardStore.values())
-        .sort((a, b) => b.wins - a.wins)
-        .slice(0, 100);
-      return { leaderboard: entries };
+      const leaderboard = await reader.getLeaderboard();
+      return { leaderboard };
     }
   );
-}
-
-export function updateLeaderboard(
-  pubkey: string,
-  displayName: string,
-  template: number,
-  won: boolean
-): void {
-  let entry = leaderboardStore.get(pubkey);
-  if (!entry) {
-    entry = { pubkey, displayName, template, wins: 0, gamesPlayed: 0 };
-    leaderboardStore.set(pubkey, entry);
-  }
-  entry.gamesPlayed++;
-  if (won) {
-    entry.wins++;
-  }
 }

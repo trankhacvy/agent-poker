@@ -1,0 +1,28 @@
+{
+  "name": "@repo/program-clients",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./agent": "./src/generated/agent/index.ts",
+    "./escrow": "./src/generated/escrow/index.ts",
+    "./game": "./src/generated/game/index.ts",
+    "./betting": "./src/generated/betting/index.ts"
+  },
+  "scripts": {
+    "generate": "tsx scripts/generate.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana/kit": "^2.1.0"
+  },
+  "devDependencies": {
+    "codama": "^1.1.0",
+    "@codama/nodes-from-anchor": "^1.1.0",
+    "@codama/renderers-js": "^1.2.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -5,12 +5,18 @@ import type { GameStateSnapshot, GameAction } from "@/lib/types";
 import { GAME_SERVER_WS_URL } from "@/lib/constants";
 import { adaptWsMessage } from "@/lib/adapters";
 
+interface PoolData {
+  totalPool: number;
+  agentPools: Record<string, number>;
+}
+
 interface UseGameWebSocketReturn {
   gameState: GameStateSnapshot | null;
   actions: GameAction[];
   bettingCountdown: number | null;
   bettingLocked: boolean;
   isConnected: boolean;
+  poolData: PoolData | null;
   subscribe: (tableId: string) => void;
   unsubscribe: (tableId: string) => void;
 }
@@ -21,6 +27,7 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
   const [bettingCountdown, setBettingCountdown] = useState<number | null>(null);
   const [bettingLocked, setBettingLocked] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [poolData, setPoolData] = useState<PoolData | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subscribedTableRef = useRef<string | null>(null);
@@ -35,9 +42,11 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
+    console.log("[WS] Connecting to", GAME_SERVER_WS_URL);
     const ws = new WebSocket(GAME_SERVER_WS_URL);
 
     ws.onopen = () => {
+      console.log("[WS] Connected!");
       setIsConnected(true);
       if (subscribedTableRef.current) {
         ws.send(
@@ -89,6 +98,12 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
             setBettingLocked(true);
             break;
           }
+          case "pool_update": {
+            if (msg.poolData) {
+              setPoolData(msg.poolData);
+            }
+            break;
+          }
           case "subscribe_ack":
           case "error":
             break;
@@ -96,12 +111,14 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
       } catch {}
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+      console.log("[WS] Closed:", e.code, e.reason);
       setIsConnected(false);
       reconnectTimeoutRef.current = setTimeout(connect, 3000);
     };
 
-    ws.onerror = () => {
+    ws.onerror = (e) => {
+      console.log("[WS] Error:", e);
       ws.close();
     };
 
@@ -124,6 +141,7 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
       setGameState(null);
       setBettingCountdown(null);
       setBettingLocked(false);
+      setPoolData(null);
       sendJson({ type: "subscribe", tableId });
     },
     [sendJson]
@@ -147,6 +165,7 @@ export function useGameWebSocket(): UseGameWebSocketReturn {
     bettingCountdown,
     bettingLocked,
     isConnected,
+    poolData,
     subscribe,
     unsubscribe,
   };

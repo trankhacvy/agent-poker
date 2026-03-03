@@ -11,10 +11,10 @@ const suitSymbols: Record<Suit, string> = {
 };
 
 const suitColors: Record<Suit, string> = {
-  hearts: "text-red-500",
-  diamonds: "text-red-500",
-  clubs: "text-zinc-100",
-  spades: "text-zinc-100",
+  hearts: "text-[#ff6b6b]",
+  diamonds: "text-[#fca311]",
+  clubs: "text-[#4ea8de]",
+  spades: "text-[#64d2d0]",
 };
 
 function decodeCard(code: number): { rank: Rank; suit: Suit } {
@@ -29,17 +29,34 @@ function decodeCard(code: number): { rank: Rank; suit: Suit } {
 interface CardProps {
   card: number;
   faceUp: boolean;
+  size?: "sm" | "md" | "lg";
 }
 
-export default function PlayingCard({ card, faceUp }: CardProps) {
+export default function PlayingCard({ card, faceUp, size = "md" }: CardProps) {
+  const sizes = {
+    sm: "w-10 h-14",
+    md: "w-12 h-[4.25rem]",
+    lg: "w-[4.5rem] h-[6.25rem]",
+  };
+
+  const rankSizes = {
+    sm: "text-base",
+    md: "text-xl",
+    lg: "text-3xl",
+  };
+
+  const cornerSizes = {
+    sm: "text-[8px]",
+    md: "text-[10px]",
+    lg: "text-sm",
+  };
+
   if (!faceUp) {
     return (
-      <div className="flex h-20 w-14 items-center justify-center rounded-lg border border-zinc-600 bg-gradient-to-br from-blue-900 to-blue-700 shadow-lg">
-        <div className="h-14 w-8 rounded border border-blue-400/30 bg-blue-800">
-          <div className="flex h-full items-center justify-center text-lg text-blue-400/50">
-            ♠
-          </div>
-        </div>
+      <div
+        className={`${sizes[size]} flex-shrink-0 rounded-lg border-2 border-white/10 bg-[#64d2d0] shadow-lg relative overflow-hidden`}
+      >
+        <div className="absolute inset-0 opacity-20 bg-[linear-gradient(45deg,transparent_25%,rgba(255,255,255,0.2)_25%,rgba(255,255,255,0.2)_50%,transparent_50%,transparent_75%,rgba(255,255,255,0.2)_75%,rgba(255,255,255,0.2)_100%)] bg-[length:8px_8px]" />
       </div>
     );
   }
@@ -49,16 +66,16 @@ export default function PlayingCard({ card, faceUp }: CardProps) {
   const color = suitColors[suit];
 
   return (
-    <div className="flex h-20 w-14 flex-col justify-between rounded-lg border border-zinc-500 bg-white p-1 shadow-lg">
-      <div className={`text-xs font-bold leading-none ${color}`}>
-        <div>{rank}</div>
-        <div>{symbol}</div>
-      </div>
-      <div className={`self-center text-2xl ${color}`}>{symbol}</div>
-      <div className={`rotate-180 self-end text-xs font-bold leading-none ${color}`}>
-        <div>{rank}</div>
-        <div>{symbol}</div>
-      </div>
+    <div
+      className={`${sizes[size]} flex-shrink-0 rounded-lg border border-white/10 bg-[#232f3e] shadow-lg flex flex-col items-center justify-center relative`}
+    >
+      <span className={`font-bold ${color} ${rankSizes[size]}`}>{rank}</span>
+      <span className={`absolute top-1 left-1.5 ${color} ${cornerSizes[size]} leading-none`}>
+        {symbol}
+      </span>
+      <span className={`absolute bottom-1 right-1.5 rotate-180 ${color} ${cornerSizes[size]} leading-none`}>
+        {symbol}
+      </span>
     </div>
   );
 }

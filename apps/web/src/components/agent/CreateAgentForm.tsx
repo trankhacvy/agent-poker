@@ -27,9 +27,9 @@ export default function CreateAgentForm() {
   }
 
   return (
-    <Card className="bg-zinc-900/60">
+    <Card>
       <CardHeader>
-        <CardTitle className="text-lg text-zinc-100">
+        <CardTitle className="text-lg text-foreground">
           Create New Agent
         </CardTitle>
       </CardHeader>
@@ -41,10 +41,10 @@ export default function CreateAgentForm() {
             {TEMPLATES.map((template) => (
               <button
                 key={template.id}
-                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all ${
+                className={`flex flex-col items-center gap-2 border-2 p-4 text-center transition-all ${
                   selectedTemplate === template.id
-                    ? "border-emerald-500 bg-emerald-900/20"
-                    : "border-zinc-700 bg-zinc-800/50 hover:border-zinc-600"
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-muted hover:border-muted-foreground"
                 }`}
                 onClick={() => setSelectedTemplate(template.id)}
               >
@@ -55,7 +55,7 @@ export default function CreateAgentForm() {
                 >
                   {template.name}
                 </span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-muted-foreground">
                   {template.description}
                 </span>
               </button>
@@ -72,11 +72,11 @@ export default function CreateAgentForm() {
             maxLength={20}
             placeholder="My Agent"
           />
-          <span className="text-xs text-zinc-600">{displayName.length}/20</span>
+          <span className="text-xs text-muted-foreground">{displayName.length}/20</span>
         </div>
 
         {!connected ? (
-          <p className="text-center text-sm text-zinc-500">
+          <p className="text-center text-sm text-muted-foreground">
             Connect your wallet to create an agent
           </p>
         ) : (

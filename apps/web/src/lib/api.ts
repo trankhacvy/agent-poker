@@ -62,3 +62,81 @@ export async function fetchGameState(gameId: string): Promise<GameStateSnapshot 
   const json = await res.json();
   return adaptGameState(json as Parameters<typeof adaptGameState>[0]);
 }
+
+export interface GameHistoryRecord {
+  gameId: string;
+  tableId: string;
+  wagerTier: number;
+  pot: number;
+  winnerIndex: number;
+  players: {
+    pubkey: string;
+    displayName: string;
+    template: number;
+    seatIndex: number;
+    isWinner: boolean;
+  }[];
+  completedAt: number;
+}
+
+export async function fetchAgentGames(
+  pubkey: string,
+  offset = 0,
+  limit = 20
+): Promise<{ games: GameHistoryRecord[]; total: number }> {
+  const res = await fetch(
+    `${GAME_SERVER_URL}/api/agents/${pubkey}/games?offset=${offset}&limit=${limit}`
+  );
+  if (!res.ok) return { games: [], total: 0 };
+  return res.json() as Promise<{ games: GameHistoryRecord[]; total: number }>;
+}
+
+export interface StatsData {
+  totalGamesPlayed: number;
+  totalAgents: number;
+  activeGames: number;
+  totalVolume: number;
+}
+
+export async function fetchStats(): Promise<StatsData | null> {
+  const res = await fetch(`${GAME_SERVER_URL}/api/stats`);
+  if (!res.ok) return null;
+  return res.json() as Promise<StatsData>;
+}
+
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
+export async function fetchBettingPool(
+  tableId: string
+): Promise<{ totalPool: number; agentPools: Record<string, number> }> {
+  const res = await fetch(`${GAME_SERVER_URL}/api/tables/${tableId}/pool`);
+  if (!res.ok) return { totalPool: 0, agentPools: {} };
+  const raw = await res.json() as { totalPool: number; agentPools: Record<string, number> };
+  const convertedPools: Record<string, number> = {};
+  for (const [key, val] of Object.entries(raw.agentPools)) {
+    convertedPools[key] = val / LAMPORTS_PER_SOL;
+  }
+  return { totalPool: raw.totalPool / LAMPORTS_PER_SOL, agentPools: convertedPools };
+}
+
+export async function placeBet(params: {
+  tableId: string;
+  wallet: string;
+  agentPubkey: string;
+  amount: number;
+}): Promise<{ success: boolean }> {
+  const res = await fetch(`${GAME_SERVER_URL}/api/tables/${params.tableId}/bet`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      wallet: params.wallet,
+      agentPubkey: params.agentPubkey,
+      amount: params.amount,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: "Bet failed" }));
+    throw new Error((err as { message: string }).message);
+  }
+  return res.json() as Promise<{ success: boolean }>;
+}

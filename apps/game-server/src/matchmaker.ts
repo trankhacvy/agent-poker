@@ -34,7 +34,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
   private queues: Map<number, QueueEntry> = new Map();
   private tables: Map<string, TableInfo> = new Map();
   private bettingWindows: Map<string, BettingWindow> = new Map();
-  private betTracker: Map<string, Set<string>> = new Map();
+  private betPools: Map<string, Map<string, { total: number; bettors: Map<string, number> }>> = new Map();
   private wsFeed: WsFeed;
   private queueCleanupTimer: ReturnType<typeof setInterval>;
 
@@ -82,22 +82,48 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     }
   }
 
-  hasBet(poolId: string, pubkey: string): boolean {
-    const pool = this.betTracker.get(poolId);
-    return pool !== undefined && pool.has(pubkey);
+  placeBet(tableId: string, wallet: string, agentPubkey: string, amount: number): boolean {
+    if (amount <= 0) return false;
+    if (!this.isBettingWindowActive(tableId)) return false;
+
+    let tablePool = this.betPools.get(tableId);
+    if (!tablePool) {
+      tablePool = new Map();
+      this.betPools.set(tableId, tablePool);
+    }
+
+    let agentPool = tablePool.get(agentPubkey);
+    if (!agentPool) {
+      agentPool = { total: 0, bettors: new Map() };
+      tablePool.set(agentPubkey, agentPool);
+    }
+
+    const existing = agentPool.bettors.get(wallet) ?? 0;
+    agentPool.bettors.set(wallet, existing + amount);
+    agentPool.total += amount;
+
+    const poolData = this.getPool(tableId);
+    this.wsFeed.broadcast({
+      type: "pool_update",
+      data: poolData,
+      tableId,
+      timestamp: Date.now(),
+    });
+
+    return true;
   }
 
-  recordBet(poolId: string, pubkey: string): boolean {
-    let pool = this.betTracker.get(poolId);
-    if (!pool) {
-      pool = new Set();
-      this.betTracker.set(poolId, pool);
+  getPool(tableId: string): { totalPool: number; agentPools: Record<string, number> } {
+    const tablePool = this.betPools.get(tableId);
+    if (!tablePool) return { totalPool: 0, agentPools: {} };
+
+    let totalPool = 0;
+    const agentPools: Record<string, number> = {};
+    for (const [agentPubkey, pool] of tablePool) {
+      agentPools[agentPubkey] = pool.total;
+      totalPool += pool.total;
     }
-    if (pool.has(pubkey)) {
-      return false;
-    }
-    pool.add(pubkey);
-    return true;
+    return { totalPool, agentPools };
   }
 
   getBettingWindowRemaining(tableId: string): number {

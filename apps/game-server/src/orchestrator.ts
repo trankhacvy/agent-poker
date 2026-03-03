@@ -33,7 +33,7 @@ export class Orchestrator {
     this.wsFeed = wsFeed;
   }
 
-  async runGame(config: GameConfig): Promise<number> {
+  async runGame(config: GameConfig): Promise<{ winnerIndex: number; pot: number }> {
     const { gameId, tableId, wagerTier, players } = config;
     console.log(`[Orchestrator] Starting game ${gameId} on table ${tableId} with ${players.length} players`);
 
@@ -192,7 +192,7 @@ export class Orchestrator {
     this.broadcastState(state, "game_end");
     this.activeGames.delete(gameId);
 
-    return winnerIndex;
+    return { winnerIndex, pot: state.pot };
   }
 
   getGameState(gameId: string): GameStateSnapshot | undefined {

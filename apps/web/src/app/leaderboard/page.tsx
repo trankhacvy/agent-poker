@@ -32,22 +32,22 @@ export default function LeaderboardPage() {
   function headerClass(key: SortKey) {
     return `cursor-pointer transition-colors ${
       sortKey === key
-        ? "text-emerald-400"
-        : "text-zinc-500 hover:text-zinc-300"
+        ? "text-primary"
+        : "text-muted-foreground hover:text-foreground"
     }`;
   }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="mb-8 text-3xl font-bold text-zinc-100">Leaderboard</h1>
+      <h1 className="mb-8 text-3xl font-bold text-foreground">Leaderboard</h1>
 
-      <div className="overflow-hidden rounded-xl border border-zinc-800">
+      <div className="overflow-hidden border-2 border-border">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-zinc-800 bg-zinc-900/50 hover:bg-zinc-900/50">
-              <TableHead className="text-zinc-500">Rank</TableHead>
-              <TableHead className="text-zinc-500">Agent</TableHead>
-              <TableHead className="text-zinc-500">Template</TableHead>
+            <TableRow className="border-b border-border bg-muted hover:bg-muted">
+              <TableHead className="text-muted-foreground">Rank</TableHead>
+              <TableHead className="text-muted-foreground">Agent</TableHead>
+              <TableHead className="text-muted-foreground">Template</TableHead>
               <TableHead
                 className={headerClass("wins")}
                 onClick={() => setSortKey("wins")}
@@ -60,16 +60,16 @@ export default function LeaderboardPage() {
               >
                 Games {sortKey === "gamesPlayed" && "\u25BC"}
               </TableHead>
-              <TableHead className="text-zinc-500">Win Rate</TableHead>
+              <TableHead className="text-muted-foreground">Win Rate</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sorted.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-zinc-600">
+                <TableCell colSpan={6} className="py-12 text-center text-muted-foreground">
                   <div className="flex flex-col gap-3 w-full max-w-lg mx-auto">
                     {Array.from({ length: 5 }).map((_, i) => (
-                      <Skeleton key={i} className="h-10 w-full bg-zinc-800" />
+                      <Skeleton key={i} className="h-10 w-full" />
                     ))}
                   </div>
                 </TableCell>
@@ -84,18 +84,18 @@ export default function LeaderboardPage() {
               return (
                 <TableRow
                   key={agent.publicKey}
-                  className="border-b border-zinc-800/50"
+                  className="border-b border-border"
                 >
                   <TableCell>
                     <span
                       className={`font-bold ${
                         index === 0
-                          ? "text-amber-400"
+                          ? "text-secondary"
                           : index === 1
-                            ? "text-zinc-300"
+                            ? "text-foreground"
                             : index === 2
-                              ? "text-amber-700"
-                              : "text-zinc-500"
+                              ? "text-secondary/70"
+                              : "text-muted-foreground"
                       }`}
                     >
                       #{index + 1}
@@ -104,10 +104,10 @@ export default function LeaderboardPage() {
                   <TableCell>
                     <Link
                       href={`/agents/${agent.publicKey}`}
-                      className="flex items-center gap-2 transition-colors hover:text-emerald-400"
+                      className="flex items-center gap-2 transition-colors hover:text-primary"
                     >
                       <span>{templateEmojis[agent.templateId]}</span>
-                      <span className="font-medium text-zinc-200 hover:text-emerald-400">
+                      <span className="font-medium text-foreground hover:text-primary">
                         {agent.displayName}
                       </span>
                     </Link>
@@ -122,13 +122,13 @@ export default function LeaderboardPage() {
                       </span>
                     )}
                   </TableCell>
-                  <TableCell className="text-emerald-400">
+                  <TableCell className="text-primary">
                     {agent.wins}
                   </TableCell>
-                  <TableCell className="text-zinc-400">
+                  <TableCell className="text-muted-foreground">
                     {agent.gamesPlayed}
                   </TableCell>
-                  <TableCell className="text-amber-400">
+                  <TableCell className="text-secondary">
                     {winRate}%
                   </TableCell>
                 </TableRow>

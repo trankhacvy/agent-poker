@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import type { GameStateSnapshot, PlayerSnapshot } from "./types.js";
 import gameIdl from "../../../target/idl/agent_poker_game.json";
+import agentIdl from "../../../target/idl/agent_poker_agent.json";
 import {
   DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
@@ -17,10 +18,12 @@ import {
 } from "@magicblock-labs/ephemeral-rollups-sdk";
 
 const PROGRAM_ID = new PublicKey(gameIdl.address);
+const AGENT_PROGRAM_ID = new PublicKey(agentIdl.address);
 const ER_VALIDATOR = new PublicKey(DEFAULT_VALIDATOR);
 
 const GAME_SEED = Buffer.from("poker_game");
 const HAND_SEED = Buffer.from("player_hand");
+const AGENT_SEED = Buffer.from("agent");
 
 const STATUS_MAP: Record<number, PlayerSnapshot["status"]> = {
   0: "empty",
@@ -154,6 +157,7 @@ export class SolanaClient {
   private authority: Keypair;
   private program: Program;
   private erProgram: Program;
+  private agentProgram: Program;
 
   constructor(
     rpcUrl: string,
@@ -173,6 +177,7 @@ export class SolanaClient {
       commitment: "confirmed",
     });
     this.program = new Program(gameIdl as any, provider);
+    this.agentProgram = new Program(agentIdl as any, provider);
 
     this.erConnection = new Connection(erEndpoint, {
       wsEndpoint: erWsEndpoint,
@@ -445,5 +450,35 @@ export class SolanaClient {
       } catch {}
     }
     return null;
+  }
+
+  deriveAgentPda(ownerPubkey: string): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [AGENT_SEED, new PublicKey(ownerPubkey).toBuffer()],
+      AGENT_PROGRAM_ID
+    )[0];
+  }
+
+  async updateAgentStats(
+    ownerPubkey: string,
+    gamesDelta: number,
+    winsDelta: number,
+    earningsDelta: number
+  ): Promise<string> {
+    const agentPda = this.deriveAgentPda(ownerPubkey);
+
+    const tx = await (this.agentProgram.methods as any)
+      .updateStats(
+        new BN(gamesDelta),
+        new BN(winsDelta),
+        new BN(earningsDelta)
+      )
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        agent: agentPda,
+      })
+      .rpc();
+
+    return tx;
   }
 }

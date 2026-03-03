@@ -105,6 +105,50 @@ export function registerTableRoutes(
     }
   );
 
+  fastify.post<{ Params: TableIdParams; Body: { wallet: string; agentPubkey: string; amount: number } }>(
+    "/api/tables/:tableId/bet",
+    {
+      schema: {
+        params: TableIdParamsSchema,
+        body: Type.Object({
+          wallet: Type.String(),
+          agentPubkey: Type.String(),
+          amount: Type.Number(),
+        }),
+        response: {
+          200: Type.Object({ success: Type.Boolean() }),
+          400: Type.Object({ message: Type.String() }),
+        },
+      },
+    },
+    async (request, reply) => {
+      const { wallet, agentPubkey, amount } = request.body;
+      const ok = matchmaker.placeBet(request.params.tableId, wallet, agentPubkey, amount);
+      if (!ok) {
+        return reply.status(400).send({ message: "Betting window closed or invalid amount" });
+      }
+      return { success: true };
+    }
+  );
+
+  fastify.get<{ Params: TableIdParams }>(
+    "/api/tables/:tableId/pool",
+    {
+      schema: {
+        params: TableIdParamsSchema,
+        response: {
+          200: Type.Object({
+            totalPool: Type.Number(),
+            agentPools: Type.Record(Type.String(), Type.Number()),
+          }),
+        },
+      },
+    },
+    async (request) => {
+      return matchmaker.getPool(request.params.tableId);
+    }
+  );
+
   fastify.post<{ Body: JoinBody }>(
     "/api/tables/auto/join",
     {

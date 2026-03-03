@@ -29,6 +29,7 @@ export interface GameStateSnapshot {
   lastAction?: { playerIndex: number; action: GameAction };
   winnerIndex?: number;
   bigBlind?: number;
+  dealerIndex?: number;
 }
 
 export interface PlayerSnapshot {
@@ -72,6 +73,7 @@ export interface WsMessage {
     | "betting_countdown"
     | "betting_locked"
     | "queue_timeout"
+    | "pool_update"
     | "error";
   data:
     | GameStateSnapshot
@@ -79,6 +81,7 @@ export interface WsMessage {
     | TableInfo
     | BettingWindowData
     | QueueTimeoutData
+    | { totalPool: number; agentPools: Record<string, number> }
     | { message: string };
   gameId?: string;
   tableId?: string;

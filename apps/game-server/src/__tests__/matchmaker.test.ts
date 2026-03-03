@@ -165,7 +165,7 @@ describe("Matchmaker - betting window", () => {
   });
 });
 
-describe("Matchmaker - rate limiting", () => {
+describe("Matchmaker - betting pools", () => {
   let mockWsFeed: MockWsFeed;
   let Matchmaker: typeof import("../matchmaker.js").Matchmaker;
 
@@ -180,31 +180,53 @@ describe("Matchmaker - rate limiting", () => {
     vi.useRealTimers();
   });
 
-  it("allows first bet", () => {
+  it("allows bets during active betting window", () => {
     const mm = new Matchmaker(mockWsFeed as never);
-    expect(mm.recordBet("pool1", "user1")).toBe(true);
+    let tableId = "";
+    mm.on("tableFull", (config) => { tableId = config.tableId; });
+
+    for (let i = 0; i < 6; i++) {
+      mm.joinQueue(makePlayer(i), 1000);
+    }
+
+    expect(mm.placeBet(tableId, "wallet1", "pubkey_0", 10)).toBe(true);
+    const pool = mm.getPool(tableId);
+    expect(pool.totalPool).toBe(10);
+    expect(pool.agentPools["pubkey_0"]).toBe(10);
     mm.destroy();
   });
 
-  it("rejects duplicate bet", () => {
+  it("rejects bets when no active betting window", () => {
     const mm = new Matchmaker(mockWsFeed as never);
-    mm.recordBet("pool1", "user1");
-    expect(mm.recordBet("pool1", "user1")).toBe(false);
+    expect(mm.placeBet("nonexistent", "wallet1", "agent1", 10)).toBe(false);
     mm.destroy();
   });
 
-  it("allows same user to bet on different pools", () => {
+  it("accumulates bets from multiple wallets", () => {
     const mm = new Matchmaker(mockWsFeed as never);
-    expect(mm.recordBet("pool1", "user1")).toBe(true);
-    expect(mm.recordBet("pool2", "user1")).toBe(true);
+    let tableId = "";
+    mm.on("tableFull", (config) => { tableId = config.tableId; });
+
+    for (let i = 0; i < 6; i++) {
+      mm.joinQueue(makePlayer(i), 1000);
+    }
+
+    mm.placeBet(tableId, "wallet1", "pubkey_0", 10);
+    mm.placeBet(tableId, "wallet2", "pubkey_0", 5);
+    mm.placeBet(tableId, "wallet1", "pubkey_1", 20);
+
+    const pool = mm.getPool(tableId);
+    expect(pool.totalPool).toBe(35);
+    expect(pool.agentPools["pubkey_0"]).toBe(15);
+    expect(pool.agentPools["pubkey_1"]).toBe(20);
     mm.destroy();
   });
 
-  it("hasBet returns correct state", () => {
+  it("returns empty pool for unknown table", () => {
     const mm = new Matchmaker(mockWsFeed as never);
-    expect(mm.hasBet("pool1", "user1")).toBe(false);
-    mm.recordBet("pool1", "user1");
-    expect(mm.hasBet("pool1", "user1")).toBe(true);
+    const pool = mm.getPool("unknown");
+    expect(pool.totalPool).toBe(0);
+    expect(pool.agentPools).toEqual({});
     mm.destroy();
   });
 });

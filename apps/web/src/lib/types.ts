@@ -35,6 +35,7 @@ export interface GameStateSnapshot {
   bigBlind: number;
   minRaise: number;
   isShowdown: boolean;
+  winnerIndex?: number;
 }
 
 export type ActionType = "fold" | "check" | "call" | "raise" | "all-in" | "post-blind" | "deal";

@@ -8,13 +8,13 @@ import { getTemplate } from "./templates.js";
 export type LlmProvider = "gemini" | "openrouter";
 
 const GameActionSchema = z.object({
-  type: z
-    .enum(["fold", "check", "call", "raise", "all_in"])
-    .describe("The poker action to take"),
+  type: z.enum(["fold", "check", "call", "raise", "all_in"]).describe("The poker action to take"),
   amount: z
     .number()
     .optional()
-    .describe("Total bet size in BB (big blinds). Required only for raise actions. Example: 3 means raise to 3BB total."),
+    .describe(
+      "Total bet size in BB (big blinds). Required only for raise actions. Example: 3 means raise to 3BB total."
+    ),
 });
 
 function evaluateHand(cards: [number, number]): { tier: string; percentile: number } {
@@ -88,7 +88,8 @@ export class LlmGateway {
     this.minDelayMs = rateLimit > 0 ? Math.ceil(60_000 / rateLimit) : 0;
 
     if (this.provider === "openrouter") {
-      if (!opts.openrouterApiKey) throw new Error("openrouterApiKey required for openrouter provider");
+      if (!opts.openrouterApiKey)
+        throw new Error("openrouterApiKey required for openrouter provider");
       this.openrouter = createOpenRouter({ apiKey: opts.openrouterApiKey });
     } else {
       if (!opts.googleApiKey) throw new Error("googleApiKey required for gemini provider");
@@ -98,7 +99,8 @@ export class LlmGateway {
 
   private getModel(): LanguageModel {
     if (this.provider === "openrouter") {
-      return this.openrouter!.chat("google/gemini-2.5-flash");
+      // return this.openrouter!.chat("google/gemini-2.5-flash");
+      return this.openrouter!.chat("meta-llama/llama-3.3-70b-instruct");
     }
     return this.google!("gemini-2.5-flash");
   }
@@ -145,17 +147,23 @@ export class LlmGateway {
           if (action.type === "raise" && action.amount != null) {
             const bb = gameState.bigBlind ?? 1;
             const lamports = Math.round(action.amount * bb);
-            console.log(`[LLM] Seat ${playerIndex} (${tmpl.name}) decided: raise ${action.amount}BB → ${lamports} lamports`);
+            console.log(
+              `[LLM] Seat ${playerIndex} (${tmpl.name}) decided: raise ${action.amount}BB → ${lamports} lamports`
+            );
             action.amount = lamports;
           } else {
-            console.log(`[LLM] Seat ${playerIndex} (${tmpl.name}) decided: ${action.type}${action.amount ? ` ${action.amount}` : ""}`);
+            console.log(
+              `[LLM] Seat ${playerIndex} (${tmpl.name}) decided: ${action.type}${action.amount ? ` ${action.amount}` : ""}`
+            );
           }
           return action;
         }
 
         console.log(`[LLM] Seat ${playerIndex} attempt ${attempt + 1}: null output, retrying...`);
       } catch (err) {
-        console.log(`[LLM] Seat ${playerIndex} attempt ${attempt + 1} error: ${err instanceof Error ? err.message : err}`);
+        console.log(
+          `[LLM] Seat ${playerIndex} attempt ${attempt + 1} error: ${err instanceof Error ? err.message : err}`
+        );
       }
     }
 
@@ -182,10 +190,7 @@ export class LlmGateway {
     return `${bbs.toFixed(1)}BB`;
   }
 
-  private buildUserMessage(
-    gameState: GameStateSnapshot,
-    playerIndex: number
-  ): string {
+  private buildUserMessage(gameState: GameStateSnapshot, playerIndex: number): string {
     const player = gameState.players[playerIndex];
     if (!player) {
       return "No player data available. Respond with fold.";
@@ -195,9 +200,7 @@ export class LlmGateway {
     const costToCall = Math.max(0, gameState.currentBet - player.currentBet);
     const potAfterCall = gameState.pot + costToCall;
     const potOdds =
-      costToCall > 0
-        ? `${(potAfterCall / costToCall).toFixed(1)}:1`
-        : "free (you can check)";
+      costToCall > 0 ? `${(potAfterCall / costToCall).toFixed(1)}:1` : "free (you can check)";
 
     const startingStack = bb * 100;
 

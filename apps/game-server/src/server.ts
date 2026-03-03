@@ -7,22 +7,26 @@ import { LlmGateway, type LlmProvider } from "./llm-gateway.js";
 import { Orchestrator } from "./orchestrator.js";
 import { Matchmaker } from "./matchmaker.js";
 import { WsFeed } from "./ws-feed.js";
+import { OnChainReader } from "./on-chain-reader.js";
+import { AutoMatchmaker } from "./auto-matchmaker.js";
 import { registerTableRoutes } from "./routes/tables.js";
-import { registerAgentRoutes, recordAgentGame } from "./routes/agents.js";
-import { registerLeaderboardRoutes, updateLeaderboard } from "./routes/leaderboard.js";
+import { registerAgentRoutes } from "./routes/agents.js";
+import { registerLeaderboardRoutes } from "./routes/leaderboard.js";
+import {
+  registerGameHistoryRoutes,
+  incrementActiveGames,
+  decrementActiveGames,
+} from "./routes/game-history.js";
 
 const PORT = parseInt(process.env.GAME_SERVER_PORT ?? "3001", 10);
 const LLM_PROVIDER = (process.env.LLM_PROVIDER ?? "gemini") as LlmProvider;
 const GOOGLE_API_KEY = process.env.GOOGLE_GENERATIVE_AI_API_KEY ?? "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY ?? "";
-const SOLANA_RPC_URL =
-  process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-const AUTHORITY_KEYPAIR_PATH =
-  process.env.AUTHORITY_KEYPAIR_PATH ?? "~/.config/solana/id.json";
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+const AUTHORITY_KEYPAIR_PATH = process.env.AUTHORITY_KEYPAIR_PATH ?? "~/.config/solana/id.json";
 const EPHEMERAL_PROVIDER_ENDPOINT =
   process.env.EPHEMERAL_PROVIDER_ENDPOINT ?? "https://devnet.magicblock.app/";
-const EPHEMERAL_WS_ENDPOINT =
-  process.env.EPHEMERAL_WS_ENDPOINT ?? "wss://devnet.magicblock.app/";
+const EPHEMERAL_WS_ENDPOINT = process.env.EPHEMERAL_WS_ENDPOINT ?? "wss://devnet.magicblock.app/";
 
 const fastify = Fastify({ logger: true });
 
@@ -40,6 +44,7 @@ const llmGateway = new LlmGateway({
 const wsFeed = new WsFeed();
 const matchmaker = new Matchmaker(wsFeed);
 const orchestrator = new Orchestrator(solanaClient, llmGateway, wsFeed);
+const reader = new OnChainReader(SOLANA_RPC_URL);
 
 async function start(): Promise<void> {
   await fastify.register(fastifyCors, { origin: true });
@@ -48,19 +53,17 @@ async function start(): Promise<void> {
   wsFeed.registerRoutes(fastify);
 
   registerTableRoutes(fastify, matchmaker);
-  registerAgentRoutes(fastify);
-  registerLeaderboardRoutes(fastify);
+  registerAgentRoutes(fastify, reader);
+  registerLeaderboardRoutes(fastify, reader);
+  registerGameHistoryRoutes(fastify, reader);
 
-  fastify.get<{ Params: { gameId: string } }>(
-    "/api/games/:gameId",
-    async (request, reply) => {
-      const state = orchestrator.getGameState(request.params.gameId);
-      if (!state) {
-        return reply.status(404).send({ message: "Game not found" });
-      }
-      return state;
+  fastify.get<{ Params: { gameId: string } }>("/api/games/:gameId", async (request, reply) => {
+    const state = orchestrator.getGameState(request.params.gameId);
+    if (!state) {
+      return reply.status(404).send({ message: "Game not found" });
     }
-  );
+    return state;
+  });
 
   matchmaker.on("bettingLocked", (config) => {
     const gameId = Date.now().toString();
@@ -72,18 +75,30 @@ async function start(): Promise<void> {
     };
 
     matchmaker.updateTableStatus(config.tableId, "in_progress");
+    incrementActiveGames();
 
     orchestrator
       .runGame(gameConfig)
-      .then((winnerIndex) => {
+      .then(async ({ winnerIndex, pot }) => {
+        decrementActiveGames();
         matchmaker.updateTableStatus(config.tableId, "settled");
+
+        // Update agent stats on-chain for each player
         for (const player of config.players) {
           const won = player.seatIndex === winnerIndex;
-          recordAgentGame(player.pubkey, player.displayName, player.template, won);
-          updateLeaderboard(player.pubkey, player.displayName, player.template, won);
+          const earningsDelta = won ? pot - config.wagerTier : -config.wagerTier;
+          try {
+            await solanaClient.updateAgentStats(player.pubkey, 1, won ? 1 : 0, earningsDelta);
+          } catch (err) {
+            fastify.log.error(
+              { err, pubkey: player.pubkey },
+              "Failed to update agent stats on-chain"
+            );
+          }
         }
       })
       .catch((err: Error) => {
+        decrementActiveGames();
         fastify.log.error(err, "Game failed");
         matchmaker.updateTableStatus(config.tableId, "settled");
       });
@@ -95,6 +110,12 @@ async function start(): Promise<void> {
       "Queue timeout — refund handled off-chain for localnet"
     );
   });
+
+  const autoMatchmaker = new AutoMatchmaker(matchmaker, reader, {
+    intervalMs: parseInt(process.env.AUTO_MATCH_INTERVAL_MS ?? "60000", 10),
+    enabled: process.env.AUTO_MATCH_ENABLED !== "false",
+  });
+  autoMatchmaker.start();
 
   await fastify.listen({ port: PORT, host: "0.0.0.0" });
 }

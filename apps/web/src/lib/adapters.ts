@@ -10,6 +10,12 @@ import type {
 } from "./types";
 import { WAGER_TIERS } from "./constants";
 
+const LAMPORTS_PER_SOL = 1_000_000_000;
+
+function lamportsToSol(lamports: number): number {
+  return lamports / LAMPORTS_PER_SOL;
+}
+
 interface BackendPlayerSnapshot {
   pubkey: string;
   displayName: string;
@@ -30,6 +36,9 @@ interface BackendGameState {
   communityCards: number[];
   players: BackendPlayerSnapshot[];
   lastAction?: { playerIndex: number; action: { type: string; amount?: number } };
+  bigBlind?: number;
+  dealerIndex?: number;
+  winnerIndex?: number;
 }
 
 interface BackendTableInfo {
@@ -51,18 +60,28 @@ interface BackendWsMessage {
 
 interface BackendAgentRecord {
   pubkey: string;
+  owner?: string;
   displayName: string;
   template: number;
+  vault?: string;
+  balance?: number;
   gamesPlayed: number;
   wins: number;
+  createdAt?: number;
+  earnings?: number;
 }
 
 interface BackendLeaderboardEntry {
   pubkey: string;
+  owner?: string;
   displayName: string;
   template: number;
+  vault?: string;
+  balance?: number;
   wins: number;
   gamesPlayed: number;
+  earnings?: number;
+  createdAt?: number;
 }
 
 const PHASE_TO_STREET: Record<string, Street> = {
@@ -115,8 +134,8 @@ export function adaptPlayer(
     publicKey: p.pubkey,
     displayName: p.displayName,
     templateId: p.template,
-    chips: wagerTier,
-    currentBet: p.currentBet,
+    chips: lamportsToSol(wagerTier),
+    currentBet: lamportsToSol(p.currentBet),
     cards: p.holeCards ? [...p.holeCards] : [-1, -1],
     status: adaptPlayerStatus(p.status),
     isDealer: p.seatIndex === dealerIndex,
@@ -124,23 +143,23 @@ export function adaptPlayer(
 }
 
 export function adaptGameState(raw: BackendGameState): GameStateSnapshot {
-  const dealerIndex = 0;
-  const wagerTier = 0;
-  const sbAmount = Math.round(wagerTier * 50 / 1000) || 10;
-  const bbAmount = Math.round(wagerTier * 100 / 1000) || 20;
+  const dealerIndex = raw.dealerIndex ?? 0;
+  const bbAmount = raw.bigBlind ?? 20;
+  const sbAmount = Math.round(bbAmount / 2);
 
   return {
     tableId: raw.tableId,
     street: adaptStreet(raw.phase),
-    pot: raw.pot,
+    pot: lamportsToSol(raw.pot),
     communityCards: raw.communityCards,
-    players: raw.players.map((p) => adaptPlayer(p, dealerIndex, wagerTier)),
+    players: raw.players.map((p) => adaptPlayer(p, dealerIndex, 0)),
     currentPlayerIndex: raw.currentPlayer,
     dealerIndex,
-    smallBlind: sbAmount,
-    bigBlind: bbAmount,
-    minRaise: bbAmount * 2,
+    smallBlind: lamportsToSol(sbAmount),
+    bigBlind: lamportsToSol(bbAmount),
+    minRaise: lamportsToSol(bbAmount * 2),
     isShowdown: raw.phase === "showdown" || raw.phase === "settled",
+    winnerIndex: raw.winnerIndex,
   };
 }
 
@@ -148,22 +167,23 @@ export function adaptGameStateWithWager(
   raw: BackendGameState,
   wagerTierLamports: number
 ): GameStateSnapshot {
-  const dealerIndex = 0;
-  const sbAmount = Math.round(wagerTierLamports * 50 / 1000);
-  const bbAmount = Math.round(wagerTierLamports * 100 / 1000);
+  const dealerIndex = raw.dealerIndex ?? 0;
+  const bbAmount = raw.bigBlind ?? Math.round(wagerTierLamports * 100 / 1000);
+  const sbAmount = Math.round(bbAmount / 2);
 
   return {
     tableId: raw.tableId,
     street: adaptStreet(raw.phase),
-    pot: raw.pot,
+    pot: lamportsToSol(raw.pot),
     communityCards: raw.communityCards,
     players: raw.players.map((p) => adaptPlayer(p, dealerIndex, wagerTierLamports)),
     currentPlayerIndex: raw.currentPlayer,
     dealerIndex,
-    smallBlind: sbAmount,
-    bigBlind: bbAmount,
-    minRaise: bbAmount * 2,
+    smallBlind: lamportsToSol(sbAmount),
+    bigBlind: lamportsToSol(bbAmount),
+    minRaise: lamportsToSol(bbAmount * 2),
     isShowdown: raw.phase === "showdown" || raw.phase === "settled",
+    winnerIndex: raw.winnerIndex,
   };
 }
 
@@ -196,7 +216,7 @@ export function adaptLastAction(
     playerName: player.displayName,
     playerPublicKey: player.pubkey,
     actionType,
-    amount: raw.lastAction.action.amount ?? 0,
+    amount: lamportsToSol(raw.lastAction.action.amount ?? 0),
     timestamp: Date.now(),
   };
 }
@@ -217,12 +237,14 @@ export interface AdaptedWsMessage {
     | "table_update"
     | "betting_countdown"
     | "betting_locked"
+    | "pool_update"
     | "subscribe_ack"
     | "error";
   gameState?: GameStateSnapshot;
   action?: GameAction;
   table?: TableInfo;
   bettingCountdown?: { tableId: string; secondsRemaining: number };
+  poolData?: { totalPool: number; agentPools: Record<string, number> };
   gameId?: string;
   tableId?: string;
   raw: BackendWsMessage;
@@ -283,6 +305,18 @@ export function adaptWsMessage(raw: BackendWsMessage): AdaptedWsMessage {
       };
       break;
     }
+    case "pool_update": {
+      const data = raw.data as { totalPool: number; agentPools: Record<string, number> };
+      const convertedPools: Record<string, number> = {};
+      for (const [key, val] of Object.entries(data.agentPools)) {
+        convertedPools[key] = lamportsToSol(val);
+      }
+      result.poolData = {
+        totalPool: lamportsToSol(data.totalPool),
+        agentPools: convertedPools,
+      };
+      break;
+    }
     case "subscribe_ack":
     case "error":
       break;
@@ -294,27 +328,27 @@ export function adaptWsMessage(raw: BackendWsMessage): AdaptedWsMessage {
 export function adaptAgent(raw: BackendAgentRecord): AgentData {
   return {
     publicKey: raw.pubkey,
-    owner: "",
+    owner: raw.owner ?? "",
     displayName: raw.displayName,
     templateId: raw.template,
-    balance: 0,
+    balance: raw.balance ?? 0,
     gamesPlayed: raw.gamesPlayed,
     wins: raw.wins,
-    earnings: 0,
-    createdAt: 0,
+    earnings: raw.earnings ?? 0,
+    createdAt: raw.createdAt ?? 0,
   };
 }
 
 export function adaptLeaderboardEntry(raw: BackendLeaderboardEntry): AgentData {
   return {
     publicKey: raw.pubkey,
-    owner: "",
+    owner: raw.owner ?? "",
     displayName: raw.displayName,
     templateId: raw.template,
-    balance: 0,
+    balance: raw.balance ?? 0,
     gamesPlayed: raw.gamesPlayed,
     wins: raw.wins,
-    earnings: 0,
-    createdAt: 0,
+    earnings: raw.earnings ?? 0,
+    createdAt: raw.createdAt ?? 0,
   };
 }

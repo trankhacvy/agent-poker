@@ -10,13 +10,13 @@ interface ActionFeedProps {
 }
 
 const actionColors: Record<string, string> = {
-  fold: "text-zinc-500",
-  check: "text-zinc-300",
-  call: "text-blue-400",
-  raise: "text-amber-400",
-  "all-in": "text-red-400",
-  "post-blind": "text-zinc-400",
-  deal: "text-emerald-400",
+  fold: "text-muted-foreground",
+  check: "text-foreground",
+  call: "text-accent",
+  raise: "text-secondary",
+  "all-in": "text-destructive",
+  "post-blind": "text-muted-foreground",
+  deal: "text-primary",
 };
 
 function formatAction(action: GameAction): string {
@@ -48,24 +48,24 @@ export default function ActionFeed({ actions }: ActionFeedProps) {
   }, [actions]);
 
   return (
-    <Card className="bg-zinc-900/60">
-      <CardHeader className="border-b border-zinc-800 py-2 px-4">
-        <CardTitle className="text-sm font-medium text-zinc-300">Action Feed</CardTitle>
+    <Card>
+      <CardHeader className="border-b border-border py-2 px-4">
+        <CardTitle className="text-sm font-medium text-foreground">Action Feed</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         <ScrollArea className="h-64">
           <div ref={scrollRef} className="flex flex-col gap-1 p-3">
             {actions.length === 0 && (
-              <p className="text-center text-sm text-zinc-600">
+              <p className="text-center text-sm text-muted-foreground">
                 Waiting for actions...
               </p>
             )}
             {actions.map((action) => (
               <div
                 key={action.id}
-                className={`text-sm ${actionColors[action.actionType] ?? "text-zinc-400"}`}
+                className={`text-sm ${actionColors[action.actionType] ?? "text-muted-foreground"}`}
               >
-                <span className="mr-2 text-zinc-600">
+                <span className="mr-2 text-muted-foreground">
                   {new Date(action.timestamp).toLocaleTimeString([], {
                     hour: "2-digit",
                     minute: "2-digit",
