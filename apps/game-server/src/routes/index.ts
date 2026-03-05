@@ -5,6 +5,7 @@ import leaderboardRoutes from "./leaderboard.js";
 import queueRoutes from "./queue.js";
 import tableRoutes from "./tables.js";
 import statsRoutes from "./stats.js";
+import arenaRoutes from "./arena.js";
 
 export default async function routes(
   fastify: FastifyInstance
@@ -15,4 +16,5 @@ export default async function routes(
   fastify.register(queueRoutes, { prefix: "/api" });
   fastify.register(tableRoutes, { prefix: "/api" });
   fastify.register(statsRoutes, { prefix: "/api" });
+  fastify.register(arenaRoutes, { prefix: "/api" });
 }

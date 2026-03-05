@@ -22,6 +22,14 @@ const EnvSchema = z.object({
     .string()
     .default("true")
     .transform((v) => v !== "false"),
+  ARENA_MODE_ENABLED: z
+    .string()
+    .default("true")
+    .transform((v) => v !== "false"),
+  ARENA_REQUIRE_BETS: z
+    .string()
+    .default("true")
+    .transform((v) => v !== "false"),
 }).refine(
   (d) => d.AUTHORITY_PRIVATE_KEY || d.AUTHORITY_KEYPAIR_PATH,
   {

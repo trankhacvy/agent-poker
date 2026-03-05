@@ -7,6 +7,7 @@ interface ClientSubscription {
   socket: WebSocket;
   gameIds: Set<string>;
   tableIds: Set<string>;
+  channels: Set<string>;
 }
 
 export class WsFeed {
@@ -18,6 +19,7 @@ export class WsFeed {
         socket,
         gameIds: new Set(),
         tableIds: new Set(),
+        channels: new Set(),
       };
       this.clients.set(socket, subscription);
 
@@ -27,17 +29,20 @@ export class WsFeed {
             type: string;
             gameId?: string;
             tableId?: string;
+            channel?: string;
           } = JSON.parse(raw.toString());
 
           if (msg.type === "subscribe") {
             if (msg.gameId) subscription.gameIds.add(msg.gameId);
             if (msg.tableId) subscription.tableIds.add(msg.tableId);
+            if (msg.channel) subscription.channels.add(msg.channel);
             socket.send(
               JSON.stringify({
                 type: "subscribe_ack",
                 data: { message: "subscribed" },
                 gameId: msg.gameId,
                 tableId: msg.tableId,
+                channel: msg.channel,
                 timestamp: Date.now(),
               })
             );
@@ -46,6 +51,8 @@ export class WsFeed {
               subscription.gameIds.delete(msg.gameId);
             if (msg.tableId)
               subscription.tableIds.delete(msg.tableId);
+            if (msg.channel)
+              subscription.channels.delete(msg.channel);
           }
         } catch {
           // ignore malformed messages
@@ -80,6 +87,16 @@ export class WsFeed {
         sub.gameIds.has(gameId) ||
         (tableId && sub.tableIds.has(tableId))
       ) {
+        socket.send(payload);
+      }
+    }
+  }
+
+  broadcastToChannel(channel: string, message: WsMessage): void {
+    const payload = JSON.stringify(message);
+    for (const [socket, sub] of this.clients) {
+      if (socket.readyState !== 1) continue;
+      if (sub.channels.has(channel)) {
         socket.send(payload);
       }
     }

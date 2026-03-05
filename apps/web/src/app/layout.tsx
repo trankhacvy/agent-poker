@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Poppins } from "next/font/google";
+import { Poppins, Space_Grotesk, Sora } from "next/font/google";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "./globals.css";
 import WalletProvider from "@/components/layout/WalletProvider";
@@ -10,6 +10,18 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 const poppins = Poppins({
   variable: "--font-poppins",
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+});
+
+const space_grotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  weight: ["400", "500", "600", "700"],
+  subsets: ["latin"],
+});
+
+const sora = Sora({
+  variable: "--font-sora",
   weight: ["400", "500", "600", "700"],
   subsets: ["latin"],
 });
@@ -25,13 +37,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${poppins.variable}`}>
+    <html lang="en">
+      <body className={`${space_grotesk.variable} ${sora.variable}`}>
         <WalletProvider>
           <QueryProvider>
             <TooltipProvider>
+              <div>main</div>
               <Navbar />
-              <main className="pt-16">{children}</main>
+              {/* <main className="pt-16">{children}</main> */}
               <Footer />
             </TooltipProvider>
           </QueryProvider>

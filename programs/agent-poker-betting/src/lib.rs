@@ -137,6 +137,65 @@ pub mod agent_poker_betting {
         Ok(())
     }
 
+    pub fn cancel_pool(ctx: Context<CancelPool>) -> Result<()> {
+        let pool = &mut ctx.accounts.pool;
+        require!(pool.status == PoolStatus::Open, BettingError::PoolNotOpen);
+        pool.status = PoolStatus::Cancelled;
+
+        let pool_key = pool.key();
+        let total_pool = pool.total_pool;
+        emit!(PoolCancelled {
+            pool: pool_key,
+            total_pool,
+        });
+        Ok(())
+    }
+
+    pub fn refund_bet(ctx: Context<RefundBet>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        require!(
+            pool.status == PoolStatus::Cancelled,
+            BettingError::PoolNotCancelled
+        );
+
+        let bet = &ctx.accounts.bet;
+        require!(!bet.claimed, BettingError::AlreadyClaimed);
+
+        let amount = bet.amount;
+        let pool_key = ctx.accounts.pool.key();
+        let vault_seeds: &[&[u8]] = &[
+            POOL_VAULT_SEED,
+            pool_key.as_ref(),
+            &[pool.vault_bump],
+        ];
+
+        transfer_from_vault(
+            &ctx.accounts.pool_vault.to_account_info(),
+            &ctx.accounts.bettor.to_account_info(),
+            &ctx.accounts.system_program.to_account_info(),
+            vault_seeds,
+            amount,
+        )?;
+
+        emit!(BetRefunded {
+            pool: pool_key,
+            bettor: ctx.accounts.bettor.key(),
+            amount,
+        });
+        Ok(())
+    }
+
+    pub fn close_pool(ctx: Context<ClosePool>) -> Result<()> {
+        let pool = &ctx.accounts.pool;
+        require!(
+            pool.status == PoolStatus::Settled || pool.status == PoolStatus::Cancelled,
+            BettingError::PoolStillActive
+        );
+        // Pool account closed via `close = authority` in accounts struct
+        // Vault SOL drained to authority
+        Ok(())
+    }
+
     pub fn claim_winnings(ctx: Context<ClaimWinnings>, winning_pool_total: u64) -> Result<()> {
         let pool = &ctx.accounts.pool;
         let bet = &mut ctx.accounts.bet;
@@ -324,6 +383,77 @@ pub struct SettlePool<'info> {
 }
 
 #[derive(Accounts)]
+pub struct CancelPool<'info> {
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [POOL_SEED, &pool.table_id.to_le_bytes()],
+        bump = pool.bump,
+        has_one = authority @ BettingError::Unauthorized,
+    )]
+    pub pool: Account<'info, BettingPool>,
+}
+
+#[derive(Accounts)]
+pub struct RefundBet<'info> {
+    /// CHECK: bettor receives the refund. Verified via bet.bettor.
+    #[account(mut)]
+    pub bettor: AccountInfo<'info>,
+
+    #[account(
+        seeds = [POOL_SEED, &pool.table_id.to_le_bytes()],
+        bump = pool.bump,
+    )]
+    pub pool: Account<'info, BettingPool>,
+
+    /// CHECK: Pool vault PDA that holds SOL.
+    #[account(
+        mut,
+        seeds = [POOL_VAULT_SEED, pool.key().as_ref()],
+        bump = pool.vault_bump,
+    )]
+    pub pool_vault: SystemAccount<'info>,
+
+    #[account(
+        mut,
+        close = bettor,
+        seeds = [BET_SEED, pool.key().as_ref(), bettor.key().as_ref()],
+        bump = bet.bump,
+        has_one = bettor @ BettingError::Unauthorized,
+        has_one = pool @ BettingError::PoolMismatch,
+    )]
+    pub bet: Account<'info, BetAccount>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct ClosePool<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        close = authority,
+        seeds = [POOL_SEED, &pool.table_id.to_le_bytes()],
+        bump = pool.bump,
+        has_one = authority @ BettingError::Unauthorized,
+    )]
+    pub pool: Account<'info, BettingPool>,
+
+    /// CHECK: Pool vault - remaining SOL drained to authority
+    #[account(
+        mut,
+        seeds = [POOL_VAULT_SEED, pool.key().as_ref()],
+        bump = pool.vault_bump,
+    )]
+    pub pool_vault: SystemAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct ClaimWinnings<'info> {
     #[account(mut)]
     pub bettor: Signer<'info>,
@@ -384,6 +514,7 @@ pub enum PoolStatus {
     Open,
     Locked,
     Settled,
+    Cancelled,
 }
 
 #[event]
@@ -412,6 +543,19 @@ pub struct WinningsClaimed {
     pub pool: Pubkey,
     pub bettor: Pubkey,
     pub payout: u64,
+}
+
+#[event]
+pub struct PoolCancelled {
+    pub pool: Pubkey,
+    pub total_pool: u64,
+}
+
+#[event]
+pub struct BetRefunded {
+    pub pool: Pubkey,
+    pub bettor: Pubkey,
+    pub amount: u64,
 }
 
 #[error_code]
@@ -457,4 +601,10 @@ pub enum BettingError {
 
     #[msg("Insufficient funds in vault")]
     InsufficientVaultFunds,
+
+    #[msg("Pool is not cancelled")]
+    PoolNotCancelled,
+
+    #[msg("Pool is still active (must be Settled or Cancelled)")]
+    PoolStillActive,
 }

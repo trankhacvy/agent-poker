@@ -206,7 +206,7 @@ export class Orchestrator {
         currentIdx
       );
 
-      const actionCode = ACTION_MAP[action.type];
+      const actionCode = ACTION_MAP[action.type] ?? 1; // default to check if unknown
       const raiseAmount = action.amount ?? 0;
 
       this.log.info(
@@ -360,13 +360,16 @@ export class Orchestrator {
     state: GameStateSnapshot,
     type: WsMessage["type"]
   ): void {
-    this.wsFeed.broadcastToGame(state.gameId, {
+    const message: WsMessage = {
       type,
       data: state,
       gameId: state.gameId,
       tableId: state.tableId,
       timestamp: Date.now(),
-    });
+    };
+    this.wsFeed.broadcastToGame(state.gameId, message);
+    // Also broadcast to the arena channel so arena spectators see game updates
+    this.wsFeed.broadcastToChannel("arena", message);
   }
 }
 

@@ -18,4 +18,6 @@ export const TEMPLATES = [
   { id: 1, name: "Maniac", description: "Loose and wild. Plays many hands, bluffs often.", color: "#EF4444" },
   { id: 2, name: "Rock", description: "Ultra-conservative. Only plays premium hands.", color: "#6B7280" },
   { id: 3, name: "Fox", description: "Adaptive and tricky. Changes strategy based on opponents.", color: "#F59E0B" },
+  { id: 4, name: "Owl", description: "Analytical precision. Plays by the numbers.", color: "#8B5CF6" },
+  { id: 5, name: "Wolf", description: "Relentless aggression in position.", color: "#10B981" },
 ] as const;

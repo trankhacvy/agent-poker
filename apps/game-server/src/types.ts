@@ -75,6 +75,16 @@ export interface WsMessage {
     | "queue_timeout"
     | "pool_update"
     | "next_game_countdown"
+    | "arena_state_change"
+    | "arena_betting_open"
+    | "arena_betting_countdown"
+    | "arena_betting_locked"
+    | "arena_gate_failed"
+    | "arena_game_complete"
+    | "arena_game_failed"
+    | "arena_cooldown"
+    | "arena_pool_update"
+    | "arena_error"
     | "error";
   data:
     | GameStateSnapshot
@@ -84,7 +94,8 @@ export interface WsMessage {
     | QueueTimeoutData
     | { totalPool: number; agentPools: Record<string, number> }
     | { secondsRemaining: number }
-    | { message: string };
+    | { message: string }
+    | Record<string, unknown>;
   gameId?: string;
   tableId?: string;
   timestamp: number;

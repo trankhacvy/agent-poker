@@ -14,6 +14,7 @@ import matchmakerPlugin from "./matchmaker.js";
 import orchestratorPlugin from "./orchestrator.js";
 import autoQueuePlugin from "./auto-queue.js";
 import gameLifecyclePlugin from "./game-lifecycle.js";
+import arenaManagerPlugin from "./arena-manager.js";
 
 export default fp(
   async (fastify: FastifyInstance) => {
@@ -37,10 +38,14 @@ export default fp(
     // Higher-level services (depend on lower-level ones)
     await fastify.register(matchmakerPlugin);
     await fastify.register(orchestratorPlugin);
-    await fastify.register(autoQueuePlugin);
 
-    // Event wiring (depends on all services)
-    await fastify.register(gameLifecyclePlugin);
+    // Arena mode or classic auto-queue mode
+    if (fastify.env.ARENA_MODE_ENABLED) {
+      await fastify.register(arenaManagerPlugin);
+    } else {
+      await fastify.register(autoQueuePlugin);
+      await fastify.register(gameLifecyclePlugin);
+    }
   },
   { name: "plugins" }
 );

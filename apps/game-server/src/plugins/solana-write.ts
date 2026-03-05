@@ -10,6 +10,7 @@ import bs58 from "bs58";
 import type { GameStateSnapshot, PlayerSnapshot } from "../types.js";
 import gameIdl from "../../idl/agent_poker_game.json";
 import agentIdl from "../../idl/agent_poker_agent.json";
+import bettingIdl from "../../idl/agent_poker_betting.json";
 import {
   DEFAULT_VALIDATOR,
   DELEGATION_PROGRAM_ID,
@@ -22,11 +23,16 @@ import {
 
 const PROGRAM_ID = new PublicKey(gameIdl.address);
 const AGENT_PROGRAM_ID = new PublicKey(agentIdl.address);
+const BETTING_PROGRAM_ID = new PublicKey(bettingIdl.address);
 const ER_VALIDATOR = new PublicKey(DEFAULT_VALIDATOR);
 
 const GAME_SEED = Buffer.from("poker_game");
 const HAND_SEED = Buffer.from("player_hand");
 const AGENT_SEED = Buffer.from("agent");
+const POOL_SEED = Buffer.from("bet_pool");
+const POOL_VAULT_SEED = Buffer.from("pool_vault");
+const BET_SEED = Buffer.from("bet");
+const TREASURY_SEED = Buffer.from("treasury");
 
 const STATUS_MAP: Record<number, PlayerSnapshot["status"]> = {
   0: "empty",
@@ -180,6 +186,7 @@ export class SolanaClient {
   private program: Program;
   private erProgram: Program;
   private agentProgram: Program;
+  private bettingProgram: Program;
   private log: FastifyBaseLogger;
 
   private static loadKeypair(pathOrBase58: string): Keypair {
@@ -223,6 +230,7 @@ export class SolanaClient {
     });
     this.program = new Program(gameIdl as any, provider);
     this.agentProgram = new Program(agentIdl as any, provider);
+    this.bettingProgram = new Program(bettingIdl as any, provider);
 
     this.erConnection = new Connection(erEndpoint, {
       wsEndpoint: erWsEndpoint,
@@ -521,6 +529,22 @@ export class SolanaClient {
     return null;
   }
 
+  async confirmTransaction(signature: string): Promise<boolean> {
+    try {
+      const result = await this.connection.getSignatureStatus(signature, {
+        searchTransactionHistory: true,
+      });
+      const status = result?.value;
+      if (!status) return false;
+      return (
+        status.confirmationStatus === "confirmed" ||
+        status.confirmationStatus === "finalized"
+      );
+    } catch {
+      return false;
+    }
+  }
+
   deriveAgentPda(ownerPubkey: string): PublicKey {
     return PublicKey.findProgramAddressSync(
       [AGENT_SEED, new PublicKey(ownerPubkey).toBuffer()],
@@ -549,6 +573,139 @@ export class SolanaClient {
       .rpc();
 
     return tx;
+  }
+
+  // ── Betting Pool Methods ──────────────────────────────────
+
+  private deriveBettingPoolPda(tableId: string): PublicKey {
+    const tableIdBn = toBn(tableId);
+    return PublicKey.findProgramAddressSync(
+      [POOL_SEED, tableIdBn.toArrayLike(Buffer, "le", 8)],
+      BETTING_PROGRAM_ID
+    )[0];
+  }
+
+  private deriveBettingPoolVaultPda(poolPda: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [POOL_VAULT_SEED, poolPda.toBuffer()],
+      BETTING_PROGRAM_ID
+    )[0];
+  }
+
+  private deriveBetPda(poolPda: PublicKey, bettor: PublicKey): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [BET_SEED, poolPda.toBuffer(), bettor.toBuffer()],
+      BETTING_PROGRAM_ID
+    )[0];
+  }
+
+  private deriveTreasuryPda(): PublicKey {
+    return PublicKey.findProgramAddressSync(
+      [TREASURY_SEED],
+      BETTING_PROGRAM_ID
+    )[0];
+  }
+
+  async createBettingPool(
+    tableId: string,
+    agentPubkeys: string[]
+  ): Promise<void> {
+    const tableIdBn = toBn(tableId);
+    const poolPda = this.deriveBettingPoolPda(tableId);
+    const poolVault = this.deriveBettingPoolVaultPda(poolPda);
+    const agents = agentPubkeys.map((pk) => new PublicKey(pk));
+
+    // Pad to 6 agents if needed
+    while (agents.length < 6) {
+      agents.push(SystemProgram.programId);
+    }
+
+    await (this.bettingProgram.methods as any)
+      .createPool(tableIdBn, agents)
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        pool: poolPda,
+        poolVault,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  }
+
+  async lockBettingPool(tableId: string): Promise<void> {
+    const poolPda = this.deriveBettingPoolPda(tableId);
+
+    await (this.bettingProgram.methods as any)
+      .lockPool()
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        pool: poolPda,
+      })
+      .rpc();
+  }
+
+  async settleBettingPool(
+    tableId: string,
+    winnerIndex: number
+  ): Promise<void> {
+    const poolPda = this.deriveBettingPoolPda(tableId);
+    const poolVault = this.deriveBettingPoolVaultPda(poolPda);
+    const treasury = this.deriveTreasuryPda();
+
+    await (this.bettingProgram.methods as any)
+      .settlePool(winnerIndex)
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        pool: poolPda,
+        poolVault,
+        treasury,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  }
+
+  async cancelBettingPool(tableId: string): Promise<void> {
+    const poolPda = this.deriveBettingPoolPda(tableId);
+
+    await (this.bettingProgram.methods as any)
+      .cancelPool()
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        pool: poolPda,
+      })
+      .rpc();
+  }
+
+  async refundBet(tableId: string, bettorWallet: string): Promise<void> {
+    const poolPda = this.deriveBettingPoolPda(tableId);
+    const poolVault = this.deriveBettingPoolVaultPda(poolPda);
+    const bettorPubkey = new PublicKey(bettorWallet);
+    const betPda = this.deriveBetPda(poolPda, bettorPubkey);
+
+    await (this.bettingProgram.methods as any)
+      .refundBet()
+      .accountsPartial({
+        bettor: bettorPubkey,
+        pool: poolPda,
+        poolVault,
+        bet: betPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+  }
+
+  async closeBettingPool(tableId: string): Promise<void> {
+    const poolPda = this.deriveBettingPoolPda(tableId);
+    const poolVault = this.deriveBettingPoolVaultPda(poolPda);
+
+    await (this.bettingProgram.methods as any)
+      .closePool()
+      .accountsPartial({
+        authority: this.authority.publicKey,
+        pool: poolPda,
+        poolVault,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
   }
 }
 

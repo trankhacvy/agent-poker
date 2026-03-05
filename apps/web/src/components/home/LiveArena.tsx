@@ -1,46 +1,50 @@
 "use client";
 
-import Link from "next/link";
+import { useState } from "react";
 import { m } from "motion/react";
-import { Video, Coins, Clock, Trophy } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Clock, Trophy, Zap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import PokerTable from "@/components/poker/PokerTable";
 import ActionFeed from "@/components/poker/ActionFeed";
 import BettingPanel from "@/components/betting/BettingPanel";
+import ArenaAgentCard from "@/components/arena/ArenaAgentCard";
 import type { GameStateSnapshot, GameAction } from "@/lib/types";
+import type { ArenaAgentConfig, ArenaState, ArenaPoolData } from "@/lib/arena-types";
 
 interface LiveArenaProps {
-  activeTableId: string | null;
+  arenaState: ArenaState;
+  agents: ArenaAgentConfig[];
   gameState: GameStateSnapshot | null;
   actions: GameAction[];
-  poolTotal: number;
-  agentPools: Record<string, number>;
   bettingCountdown: number | null;
-  bettingLocked: boolean;
-  nextGameCountdown: number | null;
+  cooldownCountdown: number | null;
+  poolData: ArenaPoolData;
+  roundNumber: number;
+  lastWinner: { name: string; index: number; pot: number } | null;
   gameEnded: boolean;
+  gateFailedReason: string | null;
 }
 
 export default function LiveArena({
-  activeTableId,
+  arenaState,
+  agents,
   gameState,
   actions,
-  poolTotal,
-  agentPools,
   bettingCountdown,
-  bettingLocked,
-  nextGameCountdown,
+  cooldownCountdown,
+  poolData,
+  roundNumber,
+  lastWinner,
   gameEnded,
+  gateFailedReason,
 }: LiveArenaProps) {
-  const hasLiveGame = activeTableId && gameState;
+  const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
 
-  // Determine winner name for post-game display
   const winnerName =
     gameEnded && gameState?.winnerIndex != null
       ? gameState.players[gameState.winnerIndex]?.displayName
-      : null;
+      : lastWinner?.name ?? null;
 
   const winnerPublicKey =
     gameEnded && gameState?.winnerIndex != null
@@ -54,15 +58,71 @@ export default function LiveArena({
       transition={{ duration: 0.5 }}
       className="grid grid-cols-1 gap-6 lg:grid-cols-12"
     >
-      {/* --- Main Poker Table Area (Left) --- */}
+      {/* --- Main Area (Left) --- */}
       <div className="flex flex-col gap-4 lg:col-span-8">
-        {hasLiveGame ? (
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-xs">
+              Round #{roundNumber}
+            </Badge>
+            <Badge
+              variant={arenaState === "playing" ? "default" : "secondary"}
+              className="text-xs capitalize"
+            >
+              {arenaState === "idle" ? "Starting..." : arenaState}
+            </Badge>
+          </div>
+        </div>
+
+        {/* Gate Failed Flash */}
+        {gateFailedReason && arenaState === "refunding" && (
+          <m.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex items-center justify-center gap-2 border-2 border-destructive/30 bg-destructive/10 px-4 py-3"
+          >
+            <span className="text-sm text-destructive">{gateFailedReason}</span>
+            <span className="text-xs text-muted-foreground">Starting new round...</span>
+          </m.div>
+        )}
+
+        {/* Betting Phase: Agent Grid */}
+        {arenaState === "betting" && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold">Pick Your Champion</h2>
+              {bettingCountdown != null && (
+                <div className="flex items-center gap-2">
+                  <Clock className="size-4 text-primary animate-pulse" />
+                  <span className="text-2xl font-bold tabular-nums text-primary">
+                    {bettingCountdown}s
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {agents.map((agent) => (
+                <ArenaAgentCard
+                  key={agent.pubkey}
+                  agent={agent}
+                  poolAmount={poolData.agentPools[agent.pubkey] ?? 0}
+                  isSelected={selectedAgent === agent.pubkey}
+                  onSelect={setSelectedAgent}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Playing Phase: Poker Table */}
+        {(arenaState === "playing" || (gameEnded && gameState)) && gameState && (
           <>
             <PokerTable
               gameState={gameState}
               actions={actions}
               gameEnded={gameEnded}
-              nextGameCountdown={nextGameCountdown}
+              nextGameCountdown={cooldownCountdown}
             />
             {/* Winner banner */}
             {gameEnded && winnerName && (
@@ -71,53 +131,72 @@ export default function LiveArena({
                 animate={{ opacity: 1, scale: 1 }}
                 className="flex items-center justify-center gap-3 border-2 border-secondary bg-secondary/10 px-4 py-3"
               >
-                <span className="text-2xl">{"\u{1F3C6}"}</span>
+                <Trophy className="size-6 text-secondary" />
                 <span className="text-lg font-bold text-secondary">
-                  {winnerName} wins {gameState.pot} SOL!
+                  {winnerName} wins!
                 </span>
               </m.div>
             )}
             <ActionFeed actions={actions} />
           </>
-        ) : nextGameCountdown != null && nextGameCountdown > 0 ? (
-          /* Countdown to next game */
+        )}
+
+        {/* Cooldown Phase */}
+        {arenaState === "cooldown" && !gameState && (
           <Card className="relative overflow-hidden p-0">
             <div className="flex aspect-video flex-col items-center justify-center gap-4">
-              <Clock className="size-10 text-primary animate-pulse" />
-              <h2 className="text-xl font-bold text-foreground">Matching Agents...</h2>
-              <div className="flex items-center gap-2">
-                <span className="text-4xl font-bold tabular-nums text-primary">
-                  {nextGameCountdown}s
-                </span>
+              {lastWinner ? (
+                <>
+                  <Trophy className="size-10 text-secondary" />
+                  <h2 className="text-xl font-bold text-foreground">
+                    {lastWinner.name} Won!
+                  </h2>
+                </>
+              ) : (
+                <Zap className="size-10 text-primary" />
+              )}
+              {cooldownCountdown != null && (
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl font-bold tabular-nums text-primary">
+                    {cooldownCountdown}s
+                  </span>
+                </div>
+              )}
+              <p className="text-sm text-muted-foreground">Next round starting soon...</p>
+              {/* Agent virtual balances */}
+              <div className="grid grid-cols-3 gap-2 px-8 pt-2">
+                {agents.map((agent) => (
+                  <div
+                    key={agent.pubkey}
+                    className="flex items-center gap-2 rounded bg-muted px-3 py-1.5 text-xs"
+                  >
+                    <div
+                      className="size-3 rounded-full"
+                      style={{ backgroundColor: agent.color }}
+                    />
+                    <span className="font-medium">{agent.displayName}</span>
+                    <span className="ml-auto text-muted-foreground">
+                      {agent.virtualBalance} pts
+                    </span>
+                  </div>
+                ))}
               </div>
-              <p className="max-w-xs text-center text-sm text-muted-foreground">
-                Agents are being queued. A new match will begin shortly.
-              </p>
             </div>
           </Card>
-        ) : (
-          /* No live game fallback */
+        )}
+
+        {/* Idle / Waiting */}
+        {arenaState === "idle" && !gateFailedReason && (
           <Card className="relative overflow-hidden p-0">
             <div className="flex aspect-video flex-col items-center justify-center gap-4">
               <span className="relative flex size-4">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-muted-foreground opacity-75" />
-                <span className="relative inline-flex size-4 rounded-full bg-muted-foreground" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex size-4 rounded-full bg-primary" />
               </span>
-              <h2 className="text-xl font-bold text-foreground">No Live Games</h2>
+              <h2 className="text-xl font-bold text-foreground">Arena Starting...</h2>
               <p className="max-w-xs text-center text-sm text-muted-foreground">
-                Games appear here when agents are matched. Create an agent or browse tables to get
-                started.
+                6 AI agents are warming up. The first betting round will begin shortly.
               </p>
-              <div className="flex gap-3 pt-2">
-                <Link href="/agents">
-                  <Button variant="outline" size="sm">
-                    Create Agent
-                  </Button>
-                </Link>
-                <Link href="/tables">
-                  <Button size="sm">Browse Tables</Button>
-                </Link>
-              </div>
             </div>
           </Card>
         )}
@@ -125,36 +204,51 @@ export default function LiveArena({
 
       {/* --- Side Panel (Right) --- */}
       <div className="flex flex-col lg:col-span-4">
-        {hasLiveGame ? (
+        {gameState && (arenaState === "playing" || gameEnded) ? (
           <BettingPanel
-            tableId={activeTableId}
+            tableId={gameState.tableId}
             players={gameState.players}
-            poolTotal={poolTotal}
-            agentPools={agentPools}
+            poolTotal={poolData.totalPool}
+            agentPools={poolData.agentPools}
             gamePhase={gameEnded ? "complete" : "playing"}
             winnerPublicKey={winnerPublicKey}
             bettingCountdown={bettingCountdown}
-            bettingLocked={bettingLocked}
+            bettingLocked={arenaState === "playing"}
+          />
+        ) : arenaState === "betting" ? (
+          <BettingPanel
+            tableId={`arena-${roundNumber}`}
+            players={agents.map((a, i) => ({
+              seatIndex: i,
+              publicKey: a.pubkey,
+              displayName: a.displayName,
+              templateId: a.template,
+              chips: a.virtualBalance,
+              currentBet: 0,
+              cards: [-1, -1],
+              status: "active" as const,
+              isDealer: i === 0,
+            }))}
+            poolTotal={poolData.totalPool}
+            agentPools={poolData.agentPools}
+            gamePhase="playing"
+            bettingCountdown={bettingCountdown}
+            bettingLocked={false}
           />
         ) : (
           <Card className="flex h-full flex-col overflow-hidden border-border bg-card p-0">
             <div className="border-b border-border px-4 py-3">
-              <h3 className="text-sm  font-bold uppercase tracking-wider text-foreground">
-                Spectator Betting
+              <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                Arena Betting
               </h3>
             </div>
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-              <Coins className="size-10 text-muted-foreground" />
+              <Zap className="size-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
-                {nextGameCountdown != null && nextGameCountdown > 0
-                  ? "Betting will open when the next game starts."
-                  : "Betting opens when a live game starts. Watch agents battle and wager on the winner."}
+                {arenaState === "cooldown"
+                  ? "Betting opens when the next round starts."
+                  : "Arena is starting up. Betting will open soon."}
               </p>
-              <Link href="/tables">
-                <Button variant="outline" size="sm" className="mt-2">
-                  Watch Live Games
-                </Button>
-              </Link>
             </div>
           </Card>
         )}

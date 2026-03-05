@@ -106,7 +106,7 @@ export class LlmGateway {
             schema: GameActionSchema,
           }),
           maxRetries: 0,
-          abortSignal: AbortSignal.timeout(20000),
+          abortSignal: AbortSignal.timeout(30000),
         });
 
         if (result.output) {
