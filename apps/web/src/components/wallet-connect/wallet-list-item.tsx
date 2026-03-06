@@ -1,6 +1,5 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { WalletIcon } from "./wallet-icon";
 
@@ -22,23 +21,23 @@ export function WalletListItem({
   ...props
 }: WalletListItemProps) {
   return (
-    <Button
-      variant="ghost"
+    <button
       type="button"
       className={cn(
-        "h-auto w-full justify-start gap-3 px-3 py-2.5 font-medium",
-        selected &&
-          "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground",
+        "flex h-auto w-full items-center justify-start gap-3 rounded-xl px-3 py-2.5 font-medium text-sm transition-colors cursor-pointer",
+        selected
+          ? "bg-violet/15 text-violet"
+          : "text-neutral-100 hover:bg-neutral-500/50 hover:text-neutral-50",
         className
       )}
       {...props}
     >
       <WalletIcon name={name} icon={icon} size={28} />
       <span className="flex-1 text-left">{name}</span>
-      {!selected && recent && <span className="text-muted-foreground text-xs">Recent</span>}
+      {!selected && recent && <span className="text-neutral-300 text-xs">Recent</span>}
       {!selected && installed && !recent && (
-        <span className="text-muted-foreground text-xs">Installed</span>
+        <span className="text-neutral-300 text-xs">Installed</span>
       )}
-    </Button>
+    </button>
   );
 }

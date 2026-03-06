@@ -6,7 +6,6 @@ import { TEMPLATES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const templateEmojis = ["🦈", "🔥", "🪨", "🦊"];
 
@@ -27,22 +26,23 @@ export default function CreateAgentForm() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-lg text-foreground">Create New Agent</CardTitle>
-      </CardHeader>
+    <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+      <div className="p-5 border-b border-neutral-50/10">
+        <h2 className="text-lg font-semibold text-neutral-50">Create New Agent</h2>
+        <p className="text-sm text-neutral-200 mt-1">Choose a template and name your agent.</p>
+      </div>
 
-      <CardContent className="flex flex-col gap-5">
+      <div className="p-5 flex flex-col gap-5">
         <div className="flex flex-col gap-2">
           <Label>Choose Template</Label>
           <div className="grid grid-cols-2 gap-3">
             {TEMPLATES.map((template) => (
               <button
                 key={template.id}
-                className={`flex flex-col items-center gap-2 border-2 p-4 text-center transition-all ${
+                className={`flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-all cursor-pointer ${
                   selectedTemplate === template.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border bg-muted hover:border-muted-foreground"
+                    ? "border-violet/50 bg-violet/10"
+                    : "border-neutral-50/10 bg-neutral-500/30 hover:border-neutral-50/20 hover:bg-neutral-500/50"
                 }`}
                 onClick={() => setSelectedTemplate(template.id)}
               >
@@ -50,7 +50,7 @@ export default function CreateAgentForm() {
                 <span className="text-sm font-semibold" style={{ color: template.color }}>
                   {template.name}
                 </span>
-                <span className="text-xs text-muted-foreground">{template.description}</span>
+                <span className="text-xs text-neutral-200">{template.description}</span>
               </button>
             ))}
           </div>
@@ -65,23 +65,23 @@ export default function CreateAgentForm() {
             maxLength={20}
             placeholder="My Agent"
           />
-          <span className="text-xs text-muted-foreground">{displayName.length}/20</span>
+          <span className="text-xs text-neutral-300">{displayName.length}/20</span>
         </div>
 
         {!connected ? (
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-neutral-200">
             Connect your wallet to create an agent
           </p>
         ) : (
           <Button
             onClick={handleCreate}
-            // loading={loading}
+            loading={loading}
             disabled={!displayName.trim()}
           >
             Create Agent
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -158,13 +158,6 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
             }
             if (type === "game_start") {
               setGameEnded(false);
-              // Also subscribe to the game's specific feed
-              if (raw.gameId) {
-                ws.send(JSON.stringify({ type: "subscribe", gameId: raw.gameId }));
-              }
-              if (raw.tableId) {
-                ws.send(JSON.stringify({ type: "subscribe", tableId: raw.tableId }));
-              }
             }
             break;
           }

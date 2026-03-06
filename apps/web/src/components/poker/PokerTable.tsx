@@ -50,7 +50,7 @@ export default function PokerTable({
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[82%] h-[62%]">
           <div className="w-full h-full rounded-[200px] relative">
             {/* Pot display */}
-            <div className="absolute top-[22%] left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+            <div className="absolute top-[28%] left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
               <span className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
                 Total Pot
               </span>
@@ -67,7 +67,7 @@ export default function PokerTable({
             </div>
 
             {/* Community Cards */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-1.5 mt-2">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-1">
               {gameState.communityCards.map((card, i) => (
                 <PlayingCard
                   key={i}
@@ -82,7 +82,7 @@ export default function PokerTable({
                 (_, i) => (
                   <div
                     key={`empty-${i}`}
-                    className="w-[72px] h-[100px] rounded-lg border border-dashed border-white/10 bg-white/[0.02]"
+                    className="w-[60px] h-[84px] rounded-lg border border-dashed border-white/10 bg-white/[0.02]"
                   />
                 )
               )}

@@ -65,12 +65,12 @@ export default function TablesPage() {
     <div className="mx-auto max-w-6xl px-4 py-8">
       <div className="mb-8 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold text-foreground">Tables</h1>
+          <h1 className="text-3xl font-bold text-neutral-50">Tables</h1>
           <div className="flex items-center gap-1.5">
             <span
-              className={`inline-block h-2 w-2 rounded-full ${isConnected ? "bg-primary" : "bg-muted-foreground"}`}
+              className={`inline-block h-2 w-2 rounded-full ${isConnected ? "bg-green" : "bg-neutral-300"}`}
             />
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-neutral-200">
               {isConnected ? "Live" : "Offline"}
             </span>
           </div>
@@ -87,31 +87,29 @@ export default function TablesPage() {
           <ToggleGroupItem
             key={String(opt)}
             value={String(opt)}
-            className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
           >
             {opt === "all" ? "All Tiers" : WAGER_TIERS[opt as number].label}
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
 
-      <div className="overflow-hidden border-2 border-border">
+      <div className="overflow-hidden rounded-2xl border border-neutral-50/10 bg-neutral-600">
         <Table>
           <TableHeader>
-            <TableRow className="border-b border-border bg-muted hover:bg-muted">
-              <TableHead className="text-muted-foreground">Table</TableHead>
-              <TableHead className="text-muted-foreground">Status</TableHead>
-              <TableHead className="text-muted-foreground">Wager</TableHead>
-              <TableHead className="text-muted-foreground">Players</TableHead>
-              <TableHead className="text-right text-muted-foreground">Action</TableHead>
+            <TableRow className="border-b border-neutral-50/10 hover:bg-transparent">
+              <TableHead>Table</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Wager</TableHead>
+              <TableHead>Players</TableHead>
+              <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map((table) => (
               <TableRow
                 key={table.tableId}
-                className="border-b border-border"
               >
-                <TableCell className="font-medium text-foreground">
+                <TableCell className="font-medium text-neutral-50">
                   <Tooltip>
                     <TooltipTrigger className="cursor-default">
                       {table.tableId.slice(0, 8)}...
@@ -120,14 +118,14 @@ export default function TablesPage() {
                   </Tooltip>
                 </TableCell>
                 <TableCell>
-                  <Badge variant={table.status === "open" ? "success" : table.status === "full" ? "warning" : table.status === "in-progress" ? "accent" : "secondary"}>
+                  <Badge variant={table.status === "open" ? "success" : table.status === "full" ? "warning" : table.status === "in-progress" ? "default" : "secondary"}>
                     {statusLabels[table.status] ?? table.status}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-neutral-200">
                   {WAGER_TIERS[table.wagerTierIndex]?.label ?? "?"}
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="text-neutral-200">
                   {table.playerCount}/{table.maxPlayers}
                 </TableCell>
                 <TableCell className="text-right">
@@ -142,7 +140,7 @@ export default function TablesPage() {
                     )}
                     {table.status === "settled" && (
                       <Link href={`/tables/${table.tableId}`}>
-                        <Button variant="outline" size="sm">
+                        <Button variant="ghost" size="sm">
                           View
                         </Button>
                       </Link>
@@ -162,7 +160,7 @@ export default function TablesPage() {
               <TableRow>
                 <TableCell
                   colSpan={5}
-                  className="py-12 text-center text-muted-foreground"
+                  className="py-12 text-center text-neutral-200"
                 >
                   {isConnected ? (
                     "No tables found for this tier"

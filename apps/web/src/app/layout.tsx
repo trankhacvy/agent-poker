@@ -7,6 +7,7 @@ import QueryProvider from "@/components/layout/QueryProvider";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -42,9 +43,8 @@ export default function RootLayout({
         <WalletProvider>
           <QueryProvider>
             <TooltipProvider>
-              <div>main</div>
               <Navbar />
-              {/* <main className="pt-16">{children}</main> */}
+              <main className="pt-24">{children}</main>
               <Footer />
             </TooltipProvider>
           </QueryProvider>

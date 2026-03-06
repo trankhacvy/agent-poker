@@ -7,7 +7,6 @@ import { placeBet } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
 const BETTING_WINDOW_TOTAL = 60;
@@ -43,7 +42,6 @@ export default function BettingPanel({
 
   const activePlayers = players.filter((p) => p.status !== "folded");
 
-  // Derive UI state from WebSocket-driven props
   const bettingExpired = bettingLocked || bettingCountdown === 0;
   const countdown = bettingCountdown ?? 0;
   const countdownProgress = bettingCountdown != null ? (bettingCountdown / BETTING_WINDOW_TOTAL) * 100 : 0;
@@ -101,18 +99,18 @@ export default function BettingPanel({
 
   const potentialPayout = calculatePotentialPayout();
 
-  // Spectator result view: game complete but user didn't bet
+  // Spectator result view
   if (gamePhase === "complete" && !userBet) {
     const winnerPlayer = players.find((p) => p.publicKey === winnerPublicKey);
     return (
-      <Card>
-        <CardHeader className="border-b border-border py-2 px-4">
-          <CardTitle className="text-sm font-medium text-foreground">Game Result</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4">
+      <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+        <div className="border-b border-neutral-50/10 px-4 py-3">
+          <h3 className="text-sm font-semibold text-neutral-50">Game Result</h3>
+        </div>
+        <div className="flex flex-col gap-3 p-4">
           <div className="flex items-center justify-center gap-2 py-2">
             <span className="text-2xl">{"\u{1F3C6}"}</span>
-            <span className="text-lg font-bold text-secondary">
+            <span className="text-lg font-bold text-gold">
               {winnerPlayer?.displayName ?? "Unknown"} wins!
             </span>
           </div>
@@ -123,43 +121,43 @@ export default function BettingPanel({
               return (
                 <div
                   key={player.publicKey}
-                  className={`flex items-center justify-between px-3 py-2 text-sm border-2 ${
+                  className={`flex items-center justify-between rounded-xl px-3 py-2 text-sm ${
                     isWinner
-                      ? "border-secondary bg-secondary/10"
-                      : "border-border bg-muted"
+                      ? "border border-gold/30 bg-gold/10"
+                      : "bg-neutral-500/50"
                   }`}
                 >
-                  <span className="text-foreground">
+                  <span className="text-neutral-50">
                     {isWinner && "\u{1F451} "}{player.displayName}
                   </span>
-                  <span className="text-muted-foreground">{pool} SOL</span>
+                  <span className="text-neutral-200">{pool} SOL</span>
                 </div>
               );
             })}
           </div>
           <div className="flex items-center justify-between text-sm pt-1">
-            <span className="text-muted-foreground">Total Pool</span>
-            <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+            <span className="text-neutral-200">Total Pool</span>
+            <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   if (gamePhase === "complete" && bettingResult) {
     return (
-      <Card>
-        <CardHeader className="border-b border-border py-2 px-4">
-          <CardTitle className="text-sm font-medium text-foreground">Betting Result</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4 p-6">
+      <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+        <div className="border-b border-neutral-50/10 px-4 py-3">
+          <h3 className="text-sm font-semibold text-neutral-50">Betting Result</h3>
+        </div>
+        <div className="flex flex-col items-center gap-4 p-6">
           {bettingResult.won ? (
             <>
               <div className="text-4xl">{"\u{1F389}"}</div>
-              <p className="text-lg font-bold text-primary">
+              <p className="text-lg font-bold text-violet">
                 You won {bettingResult.payout.toFixed(2)} SOL!
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-neutral-200">
                 Your bet: {bettingResult.betAmount} SOL
               </p>
               <Button onClick={handleClaimWinnings} disabled={loading}>
@@ -169,53 +167,53 @@ export default function BettingPanel({
           ) : (
             <>
               <div className="text-4xl">{"\u{1F614}"}</div>
-              <p className="text-lg font-medium text-muted-foreground">Better luck next time</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-lg font-medium text-neutral-200">Better luck next time</p>
+              <p className="text-sm text-neutral-300">
                 You bet {bettingResult.betAmount} SOL on {userBet?.agentName}
               </p>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   if (userBet) {
     return (
-      <Card>
-        <CardHeader className="border-b border-border py-2 px-4">
-          <CardTitle className="text-sm font-medium text-foreground">Your Bet</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center gap-3 p-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-2xl">
+      <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+        <div className="border-b border-neutral-50/10 px-4 py-3">
+          <h3 className="text-sm font-semibold text-neutral-50">Your Bet</h3>
+        </div>
+        <div className="flex flex-col items-center gap-3 p-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet/20 text-2xl">
             {"\u2705"}
           </div>
-          <p className="text-center text-sm text-primary">
+          <p className="text-center text-sm text-violet">
             You bet {userBet.amount} SOL on {userBet.agentName}
           </p>
-          <div className="w-full border-2 border-border bg-muted p-3">
+          <div className="w-full rounded-xl bg-neutral-500/50 p-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Total Pool</span>
-              <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+              <span className="text-neutral-200">Total Pool</span>
+              <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Waiting for game to finish...</p>
-        </CardContent>
-      </Card>
+          <p className="text-xs text-neutral-300">Waiting for game to finish...</p>
+        </div>
+      </div>
     );
   }
 
-  // Locked-betting pool summary: betting closed but user didn't bet
+  // Locked-betting pool summary
   if (bettingExpired && !userBet) {
     return (
-      <Card>
-        <CardHeader className="border-b border-border py-2 px-4">
-          <CardTitle className="text-sm font-medium text-foreground">Betting Pool</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 p-4">
+      <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+        <div className="border-b border-neutral-50/10 px-4 py-3">
+          <h3 className="text-sm font-semibold text-neutral-50">Betting Pool</h3>
+        </div>
+        <div className="flex flex-col gap-3 p-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total Pool</span>
-            <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+            <span className="text-neutral-200">Total Pool</span>
+            <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
           </div>
           <div className="flex flex-col gap-1.5">
             {activePlayers.map((player) => {
@@ -223,34 +221,34 @@ export default function BettingPanel({
               return (
                 <div
                   key={player.publicKey}
-                  className="flex items-center justify-between px-3 py-2 text-sm border-2 border-border bg-muted"
+                  className="flex items-center justify-between rounded-xl px-3 py-2 text-sm bg-neutral-500/50"
                 >
-                  <span className="text-foreground">{player.displayName}</span>
-                  <span className="text-muted-foreground">{pool} SOL</span>
+                  <span className="text-neutral-50">{player.displayName}</span>
+                  <span className="text-neutral-200">{pool} SOL</span>
                 </div>
               );
             })}
           </div>
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-neutral-300">
             Betting window closed. Watching game...
           </p>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="border-b border-border py-2 px-4">
-        <CardTitle className="text-sm font-medium text-foreground">Place Your Bet</CardTitle>
-      </CardHeader>
+    <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 overflow-hidden">
+      <div className="border-b border-neutral-50/10 px-4 py-3">
+        <h3 className="text-sm font-semibold text-neutral-50">Place Your Bet</h3>
+      </div>
 
-      <CardContent className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 p-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Time Remaining</span>
+            <span className="text-neutral-200">Time Remaining</span>
             <span
-              className={` font-medium ${countdown <= 5 ? "text-destructive" : "text-foreground"}`}
+              className={`font-medium ${countdown <= 5 ? "text-destructive" : "text-neutral-50"}`}
             >
               {countdown}s
             </span>
@@ -259,8 +257,8 @@ export default function BettingPanel({
         </div>
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Total Pool</span>
-          <span className="font-medium text-secondary">{poolTotal.toLocaleString()} SOL</span>
+          <span className="text-neutral-200">Total Pool</span>
+          <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -271,16 +269,16 @@ export default function BettingPanel({
               return (
                 <button
                   key={player.publicKey}
-                  className={`flex items-center justify-between border-2 px-3 py-2 text-left text-sm transition-colors ${
+                  className={`flex items-center justify-between rounded-xl px-3 py-2 text-left text-sm transition-colors cursor-pointer ${
                     selectedAgent === player.publicKey
-                      ? "border-primary bg-primary/10"
-                      : "border-border bg-muted hover:border-muted-foreground"
+                      ? "border border-violet/50 bg-violet/10"
+                      : "bg-neutral-500/50 hover:bg-neutral-500"
                   } ${bettingExpired ? "pointer-events-none opacity-50" : ""}`}
                   onClick={() => setSelectedAgent(player.publicKey)}
                   disabled={bettingExpired}
                 >
-                  <span className="text-foreground">{player.displayName}</span>
-                  <span className="text-muted-foreground">{pool} SOL</span>
+                  <span className="text-neutral-50">{player.displayName}</span>
+                  <span className="text-neutral-200">{pool} SOL</span>
                 </button>
               );
             })}
@@ -301,9 +299,9 @@ export default function BettingPanel({
         </div>
 
         {potentialPayout > 0 && (
-          <div className="flex items-center justify-between border-2 border-border bg-primary/10 px-3 py-2 text-sm">
-            <span className="text-primary/80">Potential Payout</span>
-            <span className="font-semibold text-primary">{potentialPayout.toFixed(2)} SOL</span>
+          <div className="flex items-center justify-between rounded-xl bg-violet/10 px-3 py-2 text-sm">
+            <span className="text-violet/80">Potential Payout</span>
+            <span className="font-semibold text-violet">{potentialPayout.toFixed(2)} SOL</span>
           </div>
         )}
 
@@ -312,7 +310,7 @@ export default function BettingPanel({
         {bettingExpired ? (
           <p className="text-center text-sm text-destructive">Betting window closed</p>
         ) : !connected ? (
-          <p className="text-center text-sm text-muted-foreground">Connect wallet to place bets</p>
+          <p className="text-center text-sm text-neutral-200">Connect wallet to place bets</p>
         ) : (
           <Button
             onClick={handlePlaceBet}
@@ -321,7 +319,7 @@ export default function BettingPanel({
             {loading ? "Placing Bet..." : "Place Bet"}
           </Button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

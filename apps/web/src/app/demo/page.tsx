@@ -387,7 +387,7 @@ export default function DemoPage() {
             </button>
             <button
               onClick={resetGame}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-zinc-700 text-white hover:bg-zinc-600 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-500 text-neutral-50 hover:bg-neutral-400 transition-colors"
             >
               New Game
             </button>
@@ -405,22 +405,22 @@ export default function DemoPage() {
             />
 
             {/* Controls */}
-            <div className="bg-[#1a1f2e] rounded-xl border border-white/10 p-4">
+            <div className="bg-neutral-600 rounded-xl border border-neutral-50/10 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-white/40">Current Turn:</span>
-                  <span className="text-sm font-bold text-white">
+                  <span className="text-xs text-neutral-300">Current Turn:</span>
+                  <span className="text-sm font-bold text-neutral-50">
                     {currentPlayer?.displayName ?? "—"}
                   </span>
-                  <span className="text-xs text-white/30">
+                  <span className="text-xs text-neutral-300">
                     ({currentPlayer?.chips ?? 0} chips)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-white/30 uppercase tracking-wider">
+                  <span className="text-[10px] text-neutral-300 uppercase tracking-wider">
                     {street}
                   </span>
-                  <span className="text-[10px] text-[#fca311]">
+                  <span className="text-[10px] text-gold">
                     Pot: {pot}
                   </span>
                 </div>
@@ -464,7 +464,7 @@ export default function DemoPage() {
                     onClick={doAllIn}
                     className="bg-red-600 hover:bg-red-500"
                   />
-                  <div className="w-px bg-white/10 mx-1" />
+                  <div className="w-px bg-neutral-50/10 mx-1" />
                   <ActionButton
                     label={`Next Street (${nextStreet(street)})`}
                     shortcut="N"
@@ -474,12 +474,12 @@ export default function DemoPage() {
                 </div>
               ) : (
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-[#fca311] font-bold">
+                  <span className="text-sm text-gold font-bold">
                     Winner: {players.find((p) => p.publicKey === winnerPubkey)?.displayName}
                   </span>
                   <button
                     onClick={resetGame}
-                    className="px-4 py-2 rounded-lg text-sm font-bold bg-[#fca311] text-black hover:bg-[#e5940f] transition-colors"
+                    className="px-4 py-2 rounded-lg text-sm font-bold bg-gold text-neutral-700 hover:bg-gold/80 transition-colors"
                   >
                     Deal New Hand
                   </button>
@@ -493,8 +493,8 @@ export default function DemoPage() {
 
           {/* Right: Player states debug panel */}
           <div className="flex flex-col gap-3">
-            <div className="bg-[#1a1f2e] rounded-xl border border-white/10 p-4">
-              <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
+            <div className="bg-neutral-600 rounded-xl border border-neutral-50/10 p-4">
+              <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider mb-3">
                 Player States
               </h3>
               <div className="space-y-2">
@@ -503,8 +503,8 @@ export default function DemoPage() {
                     key={p.publicKey}
                     className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs transition-colors ${
                       i === currentPlayerIndex
-                        ? "bg-white/10 border border-white/20"
-                        : "bg-white/[0.03]"
+                        ? "bg-neutral-50/10 border border-neutral-50/20"
+                        : "bg-neutral-50/[0.03]"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -517,10 +517,10 @@ export default function DemoPage() {
                               : "bg-red-400"
                         }`}
                       />
-                      <span className="font-medium text-white/80">{p.displayName}</span>
+                      <span className="font-medium text-neutral-100">{p.displayName}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-white/40">{p.chips}</span>
+                      <span className="text-neutral-300">{p.chips}</span>
                       <span
                         className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                           p.status === "active"
@@ -539,8 +539,8 @@ export default function DemoPage() {
             </div>
 
             {/* Keyboard shortcuts reference */}
-            <div className="bg-[#1a1f2e] rounded-xl border border-white/10 p-4">
-              <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
+            <div className="bg-neutral-600 rounded-xl border border-neutral-50/10 p-4">
+              <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider mb-3">
                 Keyboard Shortcuts
               </h3>
               <div className="grid grid-cols-2 gap-1.5 text-[11px]">
@@ -553,18 +553,18 @@ export default function DemoPage() {
                   ["N", "Next Street"],
                 ].map(([key, label]) => (
                   <div key={key} className="flex items-center gap-2">
-                    <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-white/60 font-mono text-[10px]">
+                    <kbd className="px-1.5 py-0.5 bg-neutral-50/10 rounded text-neutral-200 font-mono text-[10px]">
                       {key}
                     </kbd>
-                    <span className="text-white/40">{label}</span>
+                    <span className="text-neutral-300">{label}</span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Quick scenarios */}
-            <div className="bg-[#1a1f2e] rounded-xl border border-white/10 p-4">
-              <h3 className="text-xs font-bold text-white/50 uppercase tracking-wider mb-3">
+            <div className="bg-neutral-600 rounded-xl border border-neutral-50/10 p-4">
+              <h3 className="text-xs font-bold text-neutral-300 uppercase tracking-wider mb-3">
                 Quick Scenarios
               </h3>
               <div className="flex flex-col gap-2">
@@ -689,7 +689,7 @@ function ScenarioButton({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-white/60 bg-white/[0.04] hover:bg-white/[0.08] hover:text-white/80 transition-colors"
+      className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-neutral-200 bg-neutral-50/[0.04] hover:bg-neutral-50/[0.08] hover:text-neutral-100 transition-colors"
     >
       {label}
     </button>
