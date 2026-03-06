@@ -39,9 +39,9 @@ interface CardProps {
 }
 
 const sizes = {
-  sm: "w-11 h-[60px]",
-  md: "w-14 h-[76px]",
-  lg: "w-[72px] h-[100px]",
+  sm: "w-9 h-[52px]",
+  md: "w-12 h-[68px]",
+  lg: "w-[60px] h-[84px]",
 };
 
 const rankSizes = {

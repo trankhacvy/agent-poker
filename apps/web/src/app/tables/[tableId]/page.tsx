@@ -162,7 +162,7 @@ export default function TablePage({ params }: TablePageProps) {
         </div>
 
         {gamePhase === "waiting" && !displayState && (
-          <div className="mb-6 flex flex-col items-center gap-2 border-2 border-border bg-card px-6 py-10">
+          <div className="mb-6 flex flex-col items-center gap-2 rounded-2xl border border-neutral-50/10 bg-neutral-600 px-6 py-10">
             {tableInfo?.status === "settled" ? (
               <>
                 <span className="text-lg font-bold text-secondary">Game Settled</span>
@@ -170,7 +170,7 @@ export default function TablePage({ params }: TablePageProps) {
                   {tableInfo.players.map((p, i) => (
                     <div
                       key={p.pubkey + i}
-                      className="flex items-center justify-between border-2 border-border bg-muted px-4 py-2"
+                      className="flex items-center justify-between rounded-xl border border-neutral-50/10 bg-neutral-500/50 px-4 py-2"
                     >
                       <div>
                         <span className="font-medium text-foreground">{p.displayName}</span>
@@ -198,7 +198,7 @@ export default function TablePage({ params }: TablePageProps) {
             initial={{ opacity: 0, scale: 0.8, y: -20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.5, type: "spring" }}
-            className="mb-6 flex flex-col items-center gap-2 border-2 border-secondary bg-secondary/10 px-6 py-5"
+            className="mb-6 flex flex-col items-center gap-2 rounded-2xl border border-gold/30 bg-gold/10 px-6 py-5"
           >
             <m.div
               initial={{ scale: 0 }}

@@ -51,7 +51,7 @@ function GetWalletView() {
           </div>
         </div>
       </div>
-      <Button variant="default" className="mt-2" asChild>
+      <Button variant="primary" className="mt-2" asChild>
         <a href="https://solana.com/solana-wallets" target="_blank" rel="noopener noreferrer">
           Get a Wallet
           <ExternalLink className="ml-2 size-3.5" />
@@ -129,7 +129,7 @@ function InstallView({
           {installInfo.installLinks.map((link) => (
             <Button
               key={link.label}
-              variant="outline"
+              variant="primary"
               size="sm"
               className="w-full justify-between"
               asChild
@@ -147,7 +147,7 @@ function InstallView({
       )}
       {installInfo?.gettingStartedSteps && onGetStarted && (
         <Button
-          variant="ghost"
+          variant="link"
           size="sm"
           className="text-muted-foreground text-xs"
           onClick={onGetStarted}
@@ -190,7 +190,7 @@ function GetStartedView({
         </ol>
       )}
       {onBack && (
-        <Button variant="outline" size="sm" onClick={onBack}>
+        <Button variant="link" size="sm" onClick={onBack}>
           Back
         </Button>
       )}

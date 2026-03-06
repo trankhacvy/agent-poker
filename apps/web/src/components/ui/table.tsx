@@ -8,7 +8,7 @@ const Table = React.forwardRef<
   <div className="relative w-full overflow-auto">
     <table
       ref={ref}
-      className={cn('w-full caption-bottom text-sm border-3 border-foreground shadow-[4px_4px_0px_hsl(var(--shadow-color))]', className)}
+      className={cn('w-full caption-bottom text-sm', className)}
       {...props}
     />
   </div>
@@ -19,7 +19,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('bg-muted [&_tr]:border-b-3', className)} {...props} />
+  <thead ref={ref} className={cn('bg-neutral-500/50 [&_tr]:border-b', className)} {...props} />
 ))
 TableHeader.displayName = 'TableHeader'
 
@@ -42,7 +42,7 @@ const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      'border-t-3 bg-muted/50 font-bold [&>tr]:last:border-b-0',
+      'border-t bg-neutral-500/30 font-medium [&>tr]:last:border-b-0',
       className
     )}
     {...props}
@@ -57,7 +57,7 @@ const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      'border-b-3 border-foreground transition-colors hover:bg-muted/50 data-[state=selected]:bg-accent',
+      'border-b border-neutral-50/5 transition-colors hover:bg-neutral-500/30 data-[state=selected]:bg-primary/10',
       className
     )}
     {...props}
@@ -72,7 +72,7 @@ const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-12 px-4 text-left align-middle font-bold uppercase tracking-wide text-foreground [&:has([role=checkbox])]:pr-0',
+      'h-12 px-4 text-left align-middle font-semibold text-neutral-200 text-xs uppercase tracking-wider [&:has([role=checkbox])]:pr-0',
       className
     )}
     {...props}
@@ -98,7 +98,7 @@ const TableCaption = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <caption
     ref={ref}
-    className={cn('mt-4 text-sm text-muted-foreground', className)}
+    className={cn('mt-4 text-sm text-neutral-200', className)}
     {...props}
   />
 ))

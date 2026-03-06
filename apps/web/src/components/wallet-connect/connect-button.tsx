@@ -34,7 +34,7 @@ export function ConnectButton({
   if (isConnecting) {
     return (
       <>
-        <Button variant="outline" disabled className={cn("gap-2", className)}>
+        <Button variant="primary" disabled className={cn("gap-2", className)}>
           <Loader2 className="size-4 animate-spin" />
           Connecting...
         </Button>
@@ -52,7 +52,7 @@ export function ConnectButton({
           showCluster={false}
           showExplorer={showExplorer}
           trigger={
-            <Button variant="outline" className={cn("gap-2", className)}>
+            <Button variant="primary" className={cn("gap-2", className)}>
               <WalletIcon name={name ?? undefined} icon={icon ?? undefined} size={20} />
               <span className="font-mono text-sm">{formatted}</span>
             </Button>

@@ -203,7 +203,7 @@ export function WalletModal({ open, onOpenChange, className }: WalletModalProps)
           {/* Header */}
           <SheetHeader className="flex-row items-center gap-2 border-b px-4 py-3">
             {view !== "list" && (
-              <Button variant="ghost" size="icon" className="size-8 shrink-0" onClick={handleBack}>
+              <Button variant="link" icon className="size-8 shrink-0" onClick={handleBack}>
                 <ChevronLeft className="size-4" />
                 <span className="sr-only">Back</span>
               </Button>

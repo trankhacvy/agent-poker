@@ -223,14 +223,14 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
         >
           <h2 className="mb-4 text-lg font-semibold text-foreground">Recent Games</h2>
           {recentGames.length === 0 ? (
-            <div className="border-2 border-border px-6 py-10 text-center text-muted-foreground">
+            <div className="rounded-2xl border border-neutral-50/10 bg-neutral-600 px-6 py-10 text-center text-muted-foreground">
               No games played yet.
             </div>
           ) : (
-            <div className="overflow-hidden border-2 border-border">
+            <div className="overflow-hidden rounded-2xl border border-neutral-50/10 bg-neutral-600">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-b border-border bg-muted hover:bg-muted">
+                  <TableRow className="border-b border-neutral-50/5 bg-neutral-500/50 hover:bg-neutral-500/50">
                     <TableHead className="text-muted-foreground">Table</TableHead>
                     <TableHead className="text-muted-foreground">Result</TableHead>
                     <TableHead className="text-muted-foreground">Earnings</TableHead>
@@ -245,7 +245,7 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
                     const earnings = isWinner ? game.pot - game.wagerTier : -game.wagerTier;
 
                     return (
-                      <TableRow key={game.gameId} className="border-b border-border">
+                      <TableRow key={game.gameId} className="border-b border-neutral-50/5">
                         <TableCell>
                           <Link
                             href={`/tables/${game.tableId}`}

@@ -50,12 +50,12 @@ const SEAT_LAYOUTS: Record<number, SeatDef[]> = {
     { x: "97%", y: "65%", infoPos: "below" },
   ],
   6: [
-    { x: "50%", y: "102%", infoPos: "below" },
-    { x: "3%", y: "65%", infoPos: "below" },
-    { x: "8%", y: "5%", infoPos: "above" },
-    { x: "50%", y: "-2%", infoPos: "above" },
-    { x: "92%", y: "5%", infoPos: "above" },
-    { x: "97%", y: "65%", infoPos: "below" },
+    { x: "50%", y: "100%", infoPos: "below" },
+    { x: "-2%", y: "60%", infoPos: "below" },
+    { x: "10%", y: "-5%", infoPos: "above" },
+    { x: "50%", y: "-10%", infoPos: "above" },
+    { x: "90%", y: "-5%", infoPos: "above" },
+    { x: "102%", y: "60%", infoPos: "below" },
   ],
 };
 
@@ -178,7 +178,7 @@ export default function PlayerSeat({
 
       {/* Avatar frame */}
       <div
-        className={`relative w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+        className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
           isFolded ? "opacity-40 grayscale" : ""
         }`}
         style={{
@@ -187,7 +187,7 @@ export default function PlayerSeat({
           ...avatarGlow,
         }}
       >
-        <span className="text-2xl select-none">{templateEmojis[player.templateId]}</span>
+        <span className="text-xl select-none">{templateEmojis[player.templateId]}</span>
 
         {/* Winner crown - overlaid centered on top of avatar */}
         {isWinner && (

@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Card } from "@/components/ui/card";
 import type { ArenaAgentConfig } from "@/lib/arena-types";
 
 interface ArenaAgentCardProps {
@@ -20,38 +19,40 @@ export default function ArenaAgentCard({
   disabled,
 }: ArenaAgentCardProps) {
   return (
-    <Card
+    <div
       className={cn(
-        "cursor-pointer border-2 p-4 transition-all hover:border-primary/50",
-        isSelected && "border-primary bg-primary/5",
+        "cursor-pointer rounded-2xl border p-4 transition-all",
+        isSelected
+          ? "border-violet/50 bg-violet/5"
+          : "border-neutral-50/10 bg-neutral-600 hover:border-neutral-50/20",
         disabled && "cursor-not-allowed opacity-50"
       )}
       onClick={() => !disabled && onSelect(agent.pubkey)}
     >
       <div className="flex items-center gap-3">
         <div
-          className="flex size-10 items-center justify-center rounded-full text-lg font-bold text-white"
+          className="flex size-10 items-center justify-center rounded-xl text-lg font-bold text-white"
           style={{ backgroundColor: agent.color }}
         >
           {agent.displayName.charAt(0)}
         </div>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between">
-            <h4 className="font-bold" style={{ color: agent.color }}>
+            <h4 className="font-semibold truncate" style={{ color: agent.color }}>
               {agent.displayName}
             </h4>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-neutral-200 ml-2 shrink-0">
               {agent.virtualBalance} pts
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">{agent.personality}</p>
+          <p className="text-xs text-neutral-300 truncate">{agent.personality}</p>
         </div>
       </div>
       {poolAmount > 0 && (
-        <div className="mt-2 text-right text-sm font-medium text-primary">
+        <div className="mt-2 text-right text-sm font-medium text-violet">
           Pool: {poolAmount.toFixed(4)} SOL
         </div>
       )}
-    </Card>
+    </div>
   );
 }
