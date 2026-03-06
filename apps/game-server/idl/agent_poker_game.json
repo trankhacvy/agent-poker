@@ -10,8 +10,8 @@
     {
       "name": "callback_shuffle",
       "docs": [
-        "Called by the VRF oracle. Shuffles the deck, deals hole cards into the",
-        "`PlayerHand` PDAs, sets community cards, and posts blinds."
+        "VRF callback: shuffle deck, deal cards, post blinds.",
+        "Hand accounts arrive via remaining_accounts (set during request_shuffle)."
       ],
       "discriminator": [
         61,
@@ -35,30 +35,6 @@
         {
           "name": "game",
           "writable": true
-        },
-        {
-          "name": "hand0",
-          "writable": true
-        },
-        {
-          "name": "hand1",
-          "writable": true
-        },
-        {
-          "name": "hand2",
-          "writable": true
-        },
-        {
-          "name": "hand3",
-          "writable": true
-        },
-        {
-          "name": "hand4",
-          "writable": true
-        },
-        {
-          "name": "hand5",
-          "writable": true
         }
       ],
       "args": [
@@ -76,8 +52,7 @@
     {
       "name": "commit_game",
       "docs": [
-        "Commits the GameState back to the base layer and undelegates it.",
-        "Can be used after showdown_test or any time the game should return to L1."
+        "Commit GameState back to L1 without running showdown logic."
       ],
       "discriminator": [
         212,
@@ -138,9 +113,9 @@
     {
       "name": "create_game",
       "docs": [
-        "Creates GameState and all 6 PlayerHand PDAs on L1. No players yet —",
-        "they join via `join_game`. All 6 hands are created upfront because the",
-        "VRF callback writes to all 6 fixed hand slots."
+        "Create a new game. Initialises GameState on L1 and sets up its permission",
+        "for later delegation. Does NOT create any PlayerHand accounts — those are",
+        "created one-by-one in `join_game`."
       ],
       "discriminator": [
         124,
@@ -186,28 +161,30 @@
           }
         },
         {
-          "name": "hand0",
+          "name": "permission",
           "writable": true
         },
         {
-          "name": "hand1",
+          "name": "perm_delegation_buffer",
           "writable": true
         },
         {
-          "name": "hand2",
+          "name": "perm_delegation_record",
           "writable": true
         },
         {
-          "name": "hand3",
+          "name": "perm_delegation_metadata",
           "writable": true
         },
         {
-          "name": "hand4",
-          "writable": true
+          "name": "validator"
         },
         {
-          "name": "hand5",
-          "writable": true
+          "name": "permission_program",
+          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
+        },
+        {
+          "name": "delegation_program"
         },
         {
           "name": "system_program",
@@ -232,8 +209,7 @@
     {
       "name": "create_game_test",
       "docs": [
-        "Old-style game creation that initialises GameState and all 6 PlayerHand",
-        "PDAs in a single instruction. NOT for production ER flow."
+        "Test helper: create a game without setting up permissions or delegation."
       ],
       "discriminator": [
         122,
@@ -279,30 +255,6 @@
           }
         },
         {
-          "name": "hand0",
-          "writable": true
-        },
-        {
-          "name": "hand1",
-          "writable": true
-        },
-        {
-          "name": "hand2",
-          "writable": true
-        },
-        {
-          "name": "hand3",
-          "writable": true
-        },
-        {
-          "name": "hand4",
-          "writable": true
-        },
-        {
-          "name": "hand5",
-          "writable": true
-        },
-        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         }
@@ -317,83 +269,16 @@
           "type": "u64"
         },
         {
-          "name": "players",
-          "type": {
-            "vec": "pubkey"
-          }
-        },
-        {
           "name": "wager_tier",
           "type": "u64"
         }
       ]
     },
     {
-      "name": "create_permission",
-      "docs": [
-        "Creates a TEE permission entry for `GameState` or `PlayerHand` PDAs,",
-        "restricting read access on the ephemeral rollup."
-      ],
-      "discriminator": [
-        190,
-        182,
-        26,
-        164,
-        156,
-        221,
-        8,
-        0
-      ],
-      "accounts": [
-        {
-          "name": "permissioned_account"
-        },
-        {
-          "name": "permission",
-          "writable": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "permission_program",
-          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "account_type",
-          "type": {
-            "defined": {
-              "name": "AccountType"
-            }
-          }
-        },
-        {
-          "name": "members",
-          "type": {
-            "option": {
-              "vec": {
-                "defined": {
-                  "name": "Member"
-                }
-              }
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "deal_cards",
       "docs": [
-        "Simulates what callback_shuffle does, using a pre-shuffled deck",
-        "provided by the caller. NOT for production use."
+        "Test helper: deal cards from a pre-shuffled deck.",
+        "Hand accounts are passed via remaining_accounts."
       ],
       "discriminator": [
         38,
@@ -440,30 +325,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "hand0",
-          "writable": true
-        },
-        {
-          "name": "hand1",
-          "writable": true
-        },
-        {
-          "name": "hand2",
-          "writable": true
-        },
-        {
-          "name": "hand3",
-          "writable": true
-        },
-        {
-          "name": "hand4",
-          "writable": true
-        },
-        {
-          "name": "hand5",
-          "writable": true
         }
       ],
       "args": [
@@ -474,195 +335,10 @@
       ]
     },
     {
-      "name": "delegate_pda",
-      "docs": [
-        "Generic delegation instruction — delegates either the `GameState` or a",
-        "`PlayerHand` PDA to MagicBlock's TEE validator."
-      ],
-      "discriminator": [
-        248,
-        217,
-        193,
-        46,
-        124,
-        191,
-        64,
-        135
-      ],
-      "accounts": [
-        {
-          "name": "buffer_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  98,
-                  117,
-                  102,
-                  102,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                53,
-                255,
-                182,
-                6,
-                86,
-                36,
-                253,
-                15,
-                222,
-                100,
-                151,
-                235,
-                88,
-                8,
-                38,
-                135,
-                76,
-                124,
-                153,
-                5,
-                221,
-                88,
-                43,
-                134,
-                30,
-                14,
-                96,
-                136,
-                45,
-                95,
-                141,
-                41
-              ]
-            }
-          }
-        },
-        {
-          "name": "delegation_record_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  108,
-                  101,
-                  103,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "delegation_program"
-            }
-          }
-        },
-        {
-          "name": "delegation_metadata_pda",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  100,
-                  101,
-                  108,
-                  101,
-                  103,
-                  97,
-                  116,
-                  105,
-                  111,
-                  110,
-                  45,
-                  109,
-                  101,
-                  116,
-                  97,
-                  100,
-                  97,
-                  116,
-                  97
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "pda"
-              }
-            ],
-            "program": {
-              "kind": "account",
-              "path": "delegation_program"
-            }
-          }
-        },
-        {
-          "name": "pda",
-          "writable": true
-        },
-        {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "validator",
-          "optional": true
-        },
-        {
-          "name": "owner_program",
-          "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr"
-        },
-        {
-          "name": "delegation_program",
-          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "account_type",
-          "type": {
-            "defined": {
-              "name": "AccountType"
-            }
-          }
-        }
-      ]
-    },
-    {
       "name": "join_game",
       "docs": [
-        "Called on L1 per player. Assigns the player to a seat, creates and",
-        "delegates a TEE permission for the hand PDA, then delegates it to ER."
+        "A player joins the game. Creates the PlayerHand account, sets up its",
+        "permission, and delegates the hand to the Ephemeral Rollup."
       ],
       "discriminator": [
         107,
@@ -843,7 +519,7 @@
           "writable": true
         },
         {
-          "name": "permission",
+          "name": "hand_permission",
           "writable": true
         },
         {
@@ -866,16 +542,87 @@
           "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
         },
         {
+          "name": "delegation_program"
+        },
+        {
           "name": "system_program",
           "address": "11111111111111111111111111111111"
         },
         {
           "name": "owner_program",
           "address": "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr"
+        }
+      ],
+      "args": [
+        {
+          "name": "game_id",
+          "type": "u64"
         },
         {
-          "name": "delegation_program",
-          "address": "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh"
+          "name": "seat_index",
+          "type": "u8"
+        },
+        {
+          "name": "player",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "join_game_test",
+      "docs": [
+        "Test helper: join a game — creates the PlayerHand without delegation."
+      ],
+      "discriminator": [
+        78,
+        253,
+        179,
+        121,
+        142,
+        227,
+        33,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "game",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  107,
+                  101,
+                  114,
+                  95,
+                  103,
+                  97,
+                  109,
+                  101
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "game_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_hand",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -895,6 +642,9 @@
     },
     {
       "name": "player_action",
+      "docs": [
+        "Submit a player action (fold / check / call / raise / all-in)."
+      ],
       "discriminator": [
         37,
         85,
@@ -993,8 +743,7 @@
     {
       "name": "request_shuffle",
       "docs": [
-        "Submitted on the ER after delegation. Triggers a VRF randomness request;",
-        "the oracle will call `callback_shuffle` with the randomness."
+        "Request a VRF shuffle. Hand PDAs are passed via remaining_accounts."
       ],
       "discriminator": [
         130,
@@ -1053,24 +802,6 @@
           "address": "5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc"
         },
         {
-          "name": "hand0"
-        },
-        {
-          "name": "hand1"
-        },
-        {
-          "name": "hand2"
-        },
-        {
-          "name": "hand3"
-        },
-        {
-          "name": "hand4"
-        },
-        {
-          "name": "hand5"
-        },
-        {
           "name": "program_identity",
           "pda": {
             "seeds": [
@@ -1113,9 +844,8 @@
     {
       "name": "showdown",
       "docs": [
-        "Called on the ER after all betting is done. Removes TEE restrictions on",
-        "all `PlayerHand` PDAs (making hands visible), evaluates the winner, and",
-        "commits + undelegates the `GameState` back to L1."
+        "Production showdown: update hand permissions, evaluate winner, commit back to L1.",
+        "remaining_accounts layout: [hand_0 .. hand_N, perm_0 .. perm_N]"
       ],
       "discriminator": [
         42,
@@ -1162,54 +892,6 @@
           }
         },
         {
-          "name": "hand0",
-          "writable": true
-        },
-        {
-          "name": "hand1",
-          "writable": true
-        },
-        {
-          "name": "hand2",
-          "writable": true
-        },
-        {
-          "name": "hand3",
-          "writable": true
-        },
-        {
-          "name": "hand4",
-          "writable": true
-        },
-        {
-          "name": "hand5",
-          "writable": true
-        },
-        {
-          "name": "permission_hand0",
-          "writable": true
-        },
-        {
-          "name": "permission_hand1",
-          "writable": true
-        },
-        {
-          "name": "permission_hand2",
-          "writable": true
-        },
-        {
-          "name": "permission_hand3",
-          "writable": true
-        },
-        {
-          "name": "permission_hand4",
-          "writable": true
-        },
-        {
-          "name": "permission_hand5",
-          "writable": true
-        },
-        {
           "name": "permission_program",
           "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
         },
@@ -1228,7 +910,8 @@
     {
       "name": "showdown_test",
       "docs": [
-        "Evaluates winner without updating TEE permissions or committing."
+        "Test helper: showdown without ER commit or permission updates.",
+        "Hand accounts are passed via remaining_accounts."
       ],
       "discriminator": [
         53,
@@ -1272,24 +955,6 @@
               }
             ]
           }
-        },
-        {
-          "name": "hand0"
-        },
-        {
-          "name": "hand1"
-        },
-        {
-          "name": "hand2"
-        },
-        {
-          "name": "hand3"
-        },
-        {
-          "name": "hand4"
-        },
-        {
-          "name": "hand5"
         }
       ],
       "args": []
@@ -1297,8 +962,8 @@
     {
       "name": "start_game",
       "docs": [
-        "Called on L1 when enough players have joined. Creates and delegates a TEE",
-        "permission for the GameState PDA, then delegates it to the ER."
+        "Delegate GameState to the Ephemeral Rollup. Called after all players have",
+        "joined. Permission was already created/delegated in `create_game`."
       ],
       "discriminator": [
         249,
@@ -1475,27 +1140,7 @@
           }
         },
         {
-          "name": "permission",
-          "writable": true
-        },
-        {
-          "name": "perm_delegation_buffer",
-          "writable": true
-        },
-        {
-          "name": "perm_delegation_record",
-          "writable": true
-        },
-        {
-          "name": "perm_delegation_metadata",
-          "writable": true
-        },
-        {
           "name": "validator"
-        },
-        {
-          "name": "permission_program",
-          "address": "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1"
         },
         {
           "name": "system_program",
@@ -1616,42 +1261,19 @@
       "code": 6010,
       "name": "SeatTaken",
       "msg": "Seat is already taken"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidHandCount",
+      "msg": "Wrong number of hand accounts in remaining_accounts"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidHandAccount",
+      "msg": "Hand account PDA does not match expected derivation"
     }
   ],
   "types": [
-    {
-      "name": "AccountType",
-      "docs": [
-        "Enum used to identify account types for delegation and permission CPIs."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "Game",
-            "fields": [
-              {
-                "name": "game_id",
-                "type": "u64"
-              }
-            ]
-          },
-          {
-            "name": "PlayerHand",
-            "fields": [
-              {
-                "name": "game_id",
-                "type": "u64"
-              },
-              {
-                "name": "seat_index",
-                "type": "u8"
-              }
-            ]
-          }
-        ]
-      }
-    },
     {
       "name": "GameFinished",
       "type": {
@@ -1756,9 +1378,6 @@
           },
           {
             "name": "deck",
-            "docs": [
-              "Ordered deck after VRF shuffle — community cards live at indices 12-16."
-            ],
             "type": {
               "array": [
                 "u8",
@@ -1825,22 +1444,6 @@
           {
             "name": "last_action_at",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "Member",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "flags",
-            "type": "u8"
-          },
-          {
-            "name": "pubkey",
-            "type": "pubkey"
           }
         ]
       }

@@ -36,27 +36,27 @@ export default function WalletProvider({ children }: WalletProviderProps) {
     []
   );
 
-  // const wallets = useMemo(() => {
-  //   const w = [];
-  //   const secret = process.env.NEXT_PUBLIC_DEV_WALLET_SECRET;
-  //   if (secret) {
-  //     try {
-  //       const keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
-  //       w.push(new DevWalletAdapter(keypair));
-  //       console.log("[DevWallet] Loaded dev wallet:", keypair.publicKey.toBase58());
-  //     } catch (e) {
-  //       console.error("[DevWallet] Failed to parse NEXT_PUBLIC_DEV_WALLET_SECRET:", e);
-  //     }
-  //   }
-  //   return w;
-  // }, []);
+  const wallets = useMemo(() => {
+    const w: DevWalletAdapter[] = [];
+    const secret = process.env.NEXT_PUBLIC_DEV_WALLET_SECRET;
+    if (secret) {
+      try {
+        const keypair = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(secret)));
+        w.push(new DevWalletAdapter(keypair));
+        console.log("[DevWallet] Loaded dev wallet:", keypair.publicKey.toBase58());
+      } catch (e) {
+        console.error("[DevWallet] Failed to parse NEXT_PUBLIC_DEV_WALLET_SECRET:", e);
+      }
+    }
+    return w;
+  }, []);
 
-  // const isDevWallet = wallets.length > 0;
+  const isDevWallet = wallets.length > 0;
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <SolanaWalletProvider wallets={[]} autoConnect>
-        {/* {isDevWallet && <DevWalletAutoConnect />} */}
+      <SolanaWalletProvider wallets={wallets} autoConnect>
+        {isDevWallet && <DevWalletAutoConnect />}
         <WalletModalProvider>{children}</WalletModalProvider>
       </SolanaWalletProvider>
     </ConnectionProvider>

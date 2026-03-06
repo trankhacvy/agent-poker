@@ -48,6 +48,7 @@ export interface GameAction {
   actionType: ActionType;
   amount: number;
   timestamp: number;
+  reasoning?: string;
 }
 
 export type TableStatus = "open" | "full" | "in-progress" | "settled";

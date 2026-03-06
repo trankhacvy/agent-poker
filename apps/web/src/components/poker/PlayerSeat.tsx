@@ -15,53 +15,68 @@ interface PlayerSeatProps {
   latestAction?: GameAction;
 }
 
-const templateEmojis = ["\u{1F988}", "\u{1F525}", "\u{1FAA8}", "\u{1F98A}"];
+const templateEmojis = [
+  "\u{1F988}",
+  "\u{1F525}",
+  "\u{1FAA8}",
+  "\u{1F98A}",
+  "\u{1F989}",
+  "\u{1F43A}",
+];
 
 // ── Seat Layouts ────────────────────────────────────────────────────────────
-// `infoPos`: "below" → name+balance extend downward (bottom/side seats)
-//            "above" → name+balance extend upward   (top seats)
+// Each seat has a `seatType` that determines layout direction and card angle:
+//   "top"       → vertical, info above, cards below (0°)
+//   "top-left"  → vertical, info above, cards angled 45° toward center
+//   "top-right" → vertical, info above, cards angled -45° toward center
+//   "bottom"    → vertical, cards above, info below (0°)
+//   "left"      → horizontal, avatar+info left, cards right (toward center)
+//   "right"     → horizontal, cards left (toward center), avatar+info right
+
+type SeatType = "bottom" | "left" | "top-left" | "top" | "top-right" | "right";
+
 interface SeatDef {
   x: string;
   y: string;
-  infoPos: "above" | "below";
+  seatType: SeatType;
 }
 
 const SEAT_LAYOUTS: Record<number, SeatDef[]> = {
   2: [
-    { x: "50%", y: "102%", infoPos: "below" },
-    { x: "50%", y: "-2%", infoPos: "above" },
+    { x: "50%", y: "102%", seatType: "bottom" },
+    { x: "50%", y: "-2%", seatType: "top" },
   ],
   3: [
-    { x: "50%", y: "102%", infoPos: "below" },
-    { x: "8%", y: "20%", infoPos: "above" },
-    { x: "92%", y: "20%", infoPos: "above" },
+    { x: "50%", y: "102%", seatType: "bottom" },
+    { x: "8%", y: "20%", seatType: "top-left" },
+    { x: "92%", y: "20%", seatType: "top-right" },
   ],
   4: [
-    { x: "50%", y: "102%", infoPos: "below" },
-    { x: "3%", y: "50%", infoPos: "below" },
-    { x: "50%", y: "-2%", infoPos: "above" },
-    { x: "97%", y: "50%", infoPos: "below" },
+    { x: "50%", y: "102%", seatType: "bottom" },
+    { x: "3%", y: "50%", seatType: "left" },
+    { x: "50%", y: "-2%", seatType: "top" },
+    { x: "97%", y: "50%", seatType: "right" },
   ],
   5: [
-    { x: "50%", y: "102%", infoPos: "below" },
-    { x: "3%", y: "65%", infoPos: "below" },
-    { x: "12%", y: "8%", infoPos: "above" },
-    { x: "88%", y: "8%", infoPos: "above" },
-    { x: "97%", y: "65%", infoPos: "below" },
+    { x: "50%", y: "102%", seatType: "bottom" },
+    { x: "3%", y: "65%", seatType: "left" },
+    { x: "12%", y: "8%", seatType: "top-left" },
+    { x: "88%", y: "8%", seatType: "top-right" },
+    { x: "97%", y: "65%", seatType: "right" },
   ],
   6: [
-    { x: "50%", y: "100%", infoPos: "below" },
-    { x: "-2%", y: "60%", infoPos: "below" },
-    { x: "10%", y: "-5%", infoPos: "above" },
-    { x: "50%", y: "-10%", infoPos: "above" },
-    { x: "90%", y: "-5%", infoPos: "above" },
-    { x: "102%", y: "60%", infoPos: "below" },
+    { x: "50%", y: "106%", seatType: "bottom" },
+    { x: "2%", y: "75%", seatType: "left" },
+    { x: "1%", y: "5%", seatType: "top-left" },
+    { x: "50%", y: "-8%", seatType: "top" },
+    { x: "98%", y: "5%", seatType: "top-right" },
+    { x: "100%", y: "75%", seatType: "right" },
   ],
 };
 
 function getSeatPosition(index: number, total: number): SeatDef {
-  const layout = SEAT_LAYOUTS[total] ?? SEAT_LAYOUTS[6];
-  return layout[index % layout.length];
+  const layout = SEAT_LAYOUTS[total] ?? SEAT_LAYOUTS[6]!;
+  return layout[index % layout.length]!;
 }
 
 // ── Action Popup ────────────────────────────────────────────────────────────
@@ -142,9 +157,11 @@ export default function PlayerSeat({
   const isAllIn = player.status === "all-in";
   const showCards = showdownResult && !isFolded;
   const templateColor = template?.color ?? "#6B7280";
-
   const pos = getSeatPosition(seatPosition, totalSeats);
-  const infoAbove = pos.infoPos === "above";
+  const { seatType } = pos;
+  const infoAbove = seatType !== "bottom";
+  const isHorizontal = seatType === "left" || seatType === "right";
+  const cardRotation = 0;
 
   // ── Avatar border/glow ────────────────────────────────────────────────
 
@@ -162,11 +179,11 @@ export default function PlayerSeat({
         boxShadow: `0 0 30px 8px rgba(252,163,17,0.6), 0 0 60px 16px rgba(252,163,17,0.2), inset 0 0 15px rgba(252,163,17,0.1)`,
       }
     : isCurrentTurn
-      ? {
+      ? ({
           animation: "glow-pulse 2s infinite",
           "--glow-color": templateColor,
           boxShadow: `0 0 16px 4px ${templateColor}66, 0 0 32px 8px ${templateColor}22`,
-        } as React.CSSProperties
+        } as React.CSSProperties)
       : {};
 
   // ── Sub-blocks ────────────────────────────────────────────────────────
@@ -220,7 +237,6 @@ export default function PlayerSeat({
           </div>
         )}
       </div>
-
     </div>
   );
 
@@ -247,11 +263,7 @@ export default function PlayerSeat({
         )}
         <span
           className={`text-[11px] font-bold truncate max-w-[72px] ${
-            isWinner
-              ? "text-[#fca311]"
-              : isFolded
-                ? "text-zinc-500"
-                : "text-white/80"
+            isWinner ? "text-[#fca311]" : isFolded ? "text-zinc-500" : "text-white/80"
           }`}
         >
           {player.displayName}
@@ -290,9 +302,7 @@ export default function PlayerSeat({
   const handNameBlock = showdownResult && !isFolded && (
     <div
       className={`rounded-full px-2 py-0.5 text-[8px] font-bold ${
-        showdownResult.isWinner
-          ? "bg-[#fca311]/20 text-[#fca311]"
-          : "bg-white/5 text-zinc-400"
+        showdownResult.isWinner ? "bg-[#fca311]/20 text-[#fca311]" : "bg-white/5 text-zinc-400"
       }`}
     >
       {showdownResult.handName}
@@ -304,17 +314,61 @@ export default function PlayerSeat({
       <div className="w-3.5 h-3.5 rounded-full bg-[#fca311] border-2 border-[#1a1f2e] flex items-center justify-center shadow">
         <span className="text-[5px] font-bold text-[#161d26]">$</span>
       </div>
-      <span className="text-[10px] font-medium text-[#fca311]">
-        {player.currentBet}
-      </span>
+      <span className="text-[10px] font-medium text-[#fca311]">{player.currentBet}</span>
     </div>
   );
 
   // ── Layout logic ──────────────────────────────────────────────────────
   //
-  // Bottom seats: cards → avatar → name → balance  (cards face table center)
-  // Top seats:    balance → name → avatar → cards   (cards face table center)
+  // Vertical (top, top-left, top-right, bottom):
+  //   Top seats:  info → avatar → cards (with rotation for diagonals)
+  //   Bottom:     cards → avatar → info
   //
+  // Horizontal (left, right):
+  //   Left:  [info + avatar] | [cards]   (cards toward center)
+  //   Right: [cards] | [info + avatar]   (cards toward center)
+  //
+
+  const rotatedCards = cardRotation ? (
+    <div style={{ transform: `rotate(${cardRotation}deg)` }}>{cardsBlock}</div>
+  ) : (
+    cardsBlock
+  );
+
+  if (isHorizontal) {
+    const playerColumn = (
+      <div className="flex flex-col items-center gap-1">
+        {infoBlock}
+        {avatarBlock}
+      </div>
+    );
+    const cardsColumn = (
+      <div className="flex flex-col items-center gap-0.5">
+        {cardsBlock}
+        {handNameBlock}
+        {betBlock}
+      </div>
+    );
+
+    return (
+      <div
+        className="absolute flex items-center gap-2 z-10 -translate-x-1/2 -translate-y-1/2"
+        style={{ left: pos.x, top: pos.y }}
+      >
+        {seatType === "left" ? (
+          <>
+            {playerColumn}
+            {cardsColumn}
+          </>
+        ) : (
+          <>
+            {cardsColumn}
+            {playerColumn}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -324,18 +378,16 @@ export default function PlayerSeat({
       <div className="flex flex-col items-center gap-1">
         {infoAbove ? (
           <>
-            {/* Top seat: info on top, avatar middle, cards toward center (bottom) */}
             {infoBlock}
             {avatarBlock}
             <div className="flex flex-col items-center gap-0.5">
-              {cardsBlock}
+              {rotatedCards}
               {handNameBlock}
               {betBlock}
             </div>
           </>
         ) : (
           <>
-            {/* Bottom seat: cards toward center (top), avatar middle, info at bottom */}
             <div className="flex flex-col items-center gap-0.5">
               {cardsBlock}
               {handNameBlock}

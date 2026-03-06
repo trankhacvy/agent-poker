@@ -8,6 +8,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve } from "node:path";
 import bs58 from "bs58";
 import type { GameStateSnapshot, PlayerSnapshot } from "../types.js";
+import { AGENT_KEYPAIRS } from "../lib/arena-agents.js";
 import gameIdl from "../../idl/agent_poker_game.json";
 import agentIdl from "../../idl/agent_poker_agent.json";
 import bettingIdl from "../../idl/agent_poker_betting.json";
@@ -69,15 +70,12 @@ function deriveHandPda(gameId: BN, seatIndex: number): PublicKey {
   )[0];
 }
 
-function getHandAccountsMap(gameId: BN) {
-  return {
-    hand0: deriveHandPda(gameId, 0),
-    hand1: deriveHandPda(gameId, 1),
-    hand2: deriveHandPda(gameId, 2),
-    hand3: deriveHandPda(gameId, 3),
-    hand4: deriveHandPda(gameId, 4),
-    hand5: deriveHandPda(gameId, 5),
-  };
+function getHandRemainingAccounts(gameId: BN, playerCount: number) {
+  return Array.from({ length: playerCount }, (_, i) => ({
+    pubkey: deriveHandPda(gameId, i),
+    isSigner: false,
+    isWritable: true,
+  }));
 }
 
 /**
@@ -95,7 +93,7 @@ function toBn(value: string): BN {
   return new BN(hex, "be");
 }
 
-function getDelegationAccounts(pda: PublicKey, ownerProgram: PublicKey) {
+function getPermissionDelegationAccounts(pda: PublicKey) {
   const permissionPda = permissionPdaFromAccount(pda);
   return {
     permission: permissionPda,
@@ -108,40 +106,21 @@ function getDelegationAccounts(pda: PublicKey, ownerProgram: PublicKey) {
       delegationRecordPdaFromDelegatedAccount(permissionPda),
     permDelegationMetadata:
       delegationMetadataPdaFromDelegatedAccount(permissionPda),
-    bufferPlayerHand:
-      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-        pda,
-        ownerProgram
-      ),
-    delegationRecordPlayerHand:
-      delegationRecordPdaFromDelegatedAccount(pda),
-    delegationMetadataPlayerHand:
-      delegationMetadataPdaFromDelegatedAccount(pda),
   };
 }
 
-function getGameDelegationAccounts(gamePda: PublicKey) {
-  const permissionPda = permissionPdaFromAccount(gamePda);
+function getHandDelegationAccounts(handPda: PublicKey) {
   return {
-    permission: permissionPda,
-    permDelegationBuffer:
+    ...getPermissionDelegationAccounts(handPda),
+    bufferPlayerHand:
       delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-        permissionPda,
-        new PublicKey(PERMISSION_PROGRAM_ID)
-      ),
-    permDelegationRecord:
-      delegationRecordPdaFromDelegatedAccount(permissionPda),
-    permDelegationMetadata:
-      delegationMetadataPdaFromDelegatedAccount(permissionPda),
-    bufferGame:
-      delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-        gamePda,
+        handPda,
         PROGRAM_ID
       ),
-    delegationRecordGame:
-      delegationRecordPdaFromDelegatedAccount(gamePda),
-    delegationMetadataGame:
-      delegationMetadataPdaFromDelegatedAccount(gamePda),
+    delegationRecordPlayerHand:
+      delegationRecordPdaFromDelegatedAccount(handPda),
+    delegationMetadataPlayerHand:
+      delegationMetadataPdaFromDelegatedAccount(handPda),
   };
 }
 
@@ -254,16 +233,23 @@ export class SolanaClient {
     const gameIdBn = toBn(gameId);
     const tableIdBn = toBn(tableId);
     const gamePda = deriveGamePdaInternal(gameIdBn);
+    const permAccounts = getPermissionDelegationAccounts(gamePda);
 
     const tx = await (this.program.methods as any)
       .createGame(gameIdBn, tableIdBn, new BN(wagerTier))
       .accountsPartial({
         authority: this.authority.publicKey,
         game: gamePda,
-        ...getHandAccountsMap(gameIdBn),
+        permission: permAccounts.permission,
+        permDelegationBuffer: permAccounts.permDelegationBuffer,
+        permDelegationRecord: permAccounts.permDelegationRecord,
+        permDelegationMetadata: permAccounts.permDelegationMetadata,
+        validator: ER_VALIDATOR,
+        permissionProgram: new PublicKey(PERMISSION_PROGRAM_ID),
+        delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
         systemProgram: SystemProgram.programId,
       })
-      .rpc();
+      .rpc({ skipPreflight: true });
 
     return tx;
   }
@@ -276,7 +262,7 @@ export class SolanaClient {
     const gameIdBn = toBn(gameId);
     const gamePda = deriveGamePdaInternal(gameIdBn);
     const handPda = deriveHandPda(gameIdBn, seatIndex);
-    const delegAccounts = getDelegationAccounts(handPda, PROGRAM_ID);
+    const delegAccounts = getHandDelegationAccounts(handPda);
     const playerKey = new PublicKey(playerPubkey);
 
     const tx = await (this.program.methods as any)
@@ -285,7 +271,7 @@ export class SolanaClient {
         payer: this.authority.publicKey,
         game: gamePda,
         playerHand: handPda,
-        permission: delegAccounts.permission,
+        handPermission: delegAccounts.permission,
         permDelegationBuffer: delegAccounts.permDelegationBuffer,
         permDelegationRecord: delegAccounts.permDelegationRecord,
         permDelegationMetadata: delegAccounts.permDelegationMetadata,
@@ -305,49 +291,28 @@ export class SolanaClient {
     return tx;
   }
 
-  async delegateEmptyHands(
-    gameId: string,
-    filledSeats: number
-  ): Promise<void> {
-    const gameIdBn = toBn(gameId);
-
-    for (let i = filledSeats; i < 6; i++) {
-      const handPda = deriveHandPda(gameIdBn, i);
-      await (this.program.methods as any)
-        .delegatePda({
-          playerHand: { gameId: gameIdBn, seatIndex: i },
-        })
-        .accountsPartial({
-          payer: this.authority.publicKey,
-          pda: handPda,
-          validator: ER_VALIDATOR,
-        })
-        .rpc({ skipPreflight: true });
-    }
-  }
-
   async startGame(gameId: string): Promise<string> {
     const gameIdBn = toBn(gameId);
     const gamePda = deriveGamePdaInternal(gameIdBn);
-    const delegAccounts = getGameDelegationAccounts(gamePda);
 
     const tx = await (this.program.methods as any)
       .startGame(gameIdBn)
       .accountsPartial({
         payer: this.authority.publicKey,
         game: gamePda,
-        permission: delegAccounts.permission,
-        permDelegationBuffer: delegAccounts.permDelegationBuffer,
-        permDelegationRecord: delegAccounts.permDelegationRecord,
-        permDelegationMetadata: delegAccounts.permDelegationMetadata,
+        bufferGame:
+          delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+            gamePda,
+            PROGRAM_ID
+          ),
+        delegationRecordGame:
+          delegationRecordPdaFromDelegatedAccount(gamePda),
+        delegationMetadataGame:
+          delegationMetadataPdaFromDelegatedAccount(gamePda),
         validator: ER_VALIDATOR,
-        permissionProgram: new PublicKey(PERMISSION_PROGRAM_ID),
         systemProgram: SystemProgram.programId,
         ownerProgram: PROGRAM_ID,
         delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
-        bufferGame: delegAccounts.bufferGame,
-        delegationRecordGame: delegAccounts.delegationRecordGame,
-        delegationMetadataGame: delegAccounts.delegationMetadataGame,
       })
       .rpc({ skipPreflight: true });
 
@@ -373,7 +338,10 @@ export class SolanaClient {
     );
   }
 
-  async requestShuffle(gameId: string): Promise<string> {
+  async requestShuffle(
+    gameId: string,
+    playerCount: number
+  ): Promise<string> {
     const gameIdBn = toBn(gameId);
     const gamePda = deriveGamePdaInternal(gameIdBn);
 
@@ -383,8 +351,10 @@ export class SolanaClient {
         payer: this.authority.publicKey,
         game: gamePda,
         authority: this.authority.publicKey,
-        ...getHandAccountsMap(gameIdBn),
       })
+      .remainingAccounts(
+        getHandRemainingAccounts(gameIdBn, playerCount)
+      )
       .rpc({ skipPreflight: true });
 
     return tx;
@@ -436,7 +406,10 @@ export class SolanaClient {
     return tx;
   }
 
-  async showdownTest(gameId: string): Promise<string> {
+  async showdownTest(
+    gameId: string,
+    playerCount: number
+  ): Promise<string> {
     const gameIdBn = toBn(gameId);
     const gamePda = deriveGamePdaInternal(gameIdBn);
 
@@ -445,8 +418,10 @@ export class SolanaClient {
       .accountsPartial({
         authority: this.authority.publicKey,
         game: gamePda,
-        ...getHandAccountsMap(gameIdBn),
       })
+      .remainingAccounts(
+        getHandRemainingAccounts(gameIdBn, playerCount)
+      )
       .rpc({ skipPreflight: true });
 
     return tx;
@@ -706,6 +681,51 @@ export class SolanaClient {
         systemProgram: SystemProgram.programId,
       })
       .rpc();
+  }
+
+  async createArenaAgent(
+    ownerPubkey: string,
+    template: number,
+    displayName: string
+  ): Promise<string> {
+    const agentPda = this.deriveAgentPda(ownerPubkey);
+    const ownerKey = new PublicKey(ownerPubkey);
+
+    // Find the matching arena agent keypair so the owner can sign
+    const agentKeypair = AGENT_KEYPAIRS.find(
+      (kp) => kp.publicKey.toBase58() === ownerPubkey
+    );
+    if (!agentKeypair) {
+      throw new Error(`No arena keypair found for ${ownerPubkey}`);
+    }
+
+    const vaultPda = PublicKey.findProgramAddressSync(
+      [Buffer.from("agent_vault"), ownerKey.toBuffer()],
+      AGENT_PROGRAM_ID
+    )[0];
+
+    const tx = await (this.agentProgram.methods as any)
+      .createAgent(template, displayName)
+      .accountsPartial({
+        owner: ownerKey,
+        agent: agentPda,
+        vault: vaultPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([agentKeypair])
+      .rpc();
+
+    return tx;
+  }
+
+  async agentAccountExists(ownerPubkey: string): Promise<boolean> {
+    try {
+      const agentPda = this.deriveAgentPda(ownerPubkey);
+      const info = await this.connection.getAccountInfo(agentPda);
+      return info !== null;
+    } catch {
+      return false;
+    }
   }
 }
 

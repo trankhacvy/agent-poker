@@ -21,9 +21,11 @@ import {
 } from "@magicblock-labs/ephemeral-rollups-sdk";
 
 const ER_ENDPOINT =
-  process.env.EPHEMERAL_PROVIDER_ENDPOINT || "https://devnet.magicblock.app/";
+  process.env.EPHEMERAL_PROVIDER_ENDPOINT ||
+  "https://devnet.magicblock.app/";
 const ER_WS_ENDPOINT =
-  process.env.EPHEMERAL_WS_ENDPOINT || "wss://devnet.magicblock.app/";
+  process.env.EPHEMERAL_WS_ENDPOINT ||
+  "wss://devnet.magicblock.app/";
 
 describe("agent_poker_game_er", () => {
   const baseProvider = new anchor.AnchorProvider(
@@ -56,7 +58,10 @@ describe("agent_poker_game_er", () => {
     );
   }
 
-  function deriveHandPda(id: BN, seatIndex: number): [PublicKey, number] {
+  function deriveHandPda(
+    id: BN,
+    seatIndex: number
+  ): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [
         Buffer.from("player_hand"),
@@ -67,18 +72,18 @@ describe("agent_poker_game_er", () => {
     );
   }
 
-  function getHandAccounts(id: BN) {
-    return {
-      hand0: deriveHandPda(id, 0)[0],
-      hand1: deriveHandPda(id, 1)[0],
-      hand2: deriveHandPda(id, 2)[0],
-      hand3: deriveHandPda(id, 3)[0],
-      hand4: deriveHandPda(id, 4)[0],
-      hand5: deriveHandPda(id, 5)[0],
-    };
+  function getHandMetas(
+    id: BN,
+    count: number
+  ): anchor.web3.AccountMeta[] {
+    return Array.from({ length: count }, (_, i) => ({
+      pubkey: deriveHandPda(id, i)[0],
+      isSigner: false,
+      isWritable: true,
+    }));
   }
 
-  function getDelegationAccounts(pda: PublicKey, ownerProgram: PublicKey) {
+  function getPermissionDelegationAccounts(pda: PublicKey) {
     const permissionPda = permissionPdaFromAccount(pda);
     return {
       permission: permissionPda,
@@ -91,39 +96,6 @@ describe("agent_poker_game_er", () => {
         delegationRecordPdaFromDelegatedAccount(permissionPda),
       permDelegationMetadata:
         delegationMetadataPdaFromDelegatedAccount(permissionPda),
-      [`bufferPlayerHand`]:
-        delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-          pda,
-          ownerProgram
-        ),
-      [`delegationRecordPlayerHand`]:
-        delegationRecordPdaFromDelegatedAccount(pda),
-      [`delegationMetadataPlayerHand`]:
-        delegationMetadataPdaFromDelegatedAccount(pda),
-    };
-  }
-
-  function getGameDelegationAccounts(gamePda: PublicKey) {
-    const permissionPda = permissionPdaFromAccount(gamePda);
-    return {
-      permission: permissionPda,
-      permDelegationBuffer:
-        delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-          permissionPda,
-          new PublicKey(PERMISSION_PROGRAM_ID)
-        ),
-      permDelegationRecord:
-        delegationRecordPdaFromDelegatedAccount(permissionPda),
-      permDelegationMetadata:
-        delegationMetadataPdaFromDelegatedAccount(permissionPda),
-      bufferGame: delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
-        gamePda,
-        baseProgram.programId
-      ),
-      delegationRecordGame:
-        delegationRecordPdaFromDelegatedAccount(gamePda),
-      delegationMetadataGame:
-        delegationMetadataPdaFromDelegatedAccount(gamePda),
     };
   }
 
@@ -149,30 +121,39 @@ describe("agent_poker_game_er", () => {
     console.log("Authority:", authority.publicKey.toBase58());
   });
 
-  it("creates game on base layer", async () => {
+  it("creates game on base layer (with permission for GameState)", async () => {
+    const permAccounts = getPermissionDelegationAccounts(gamePda);
+
     await baseProgram.methods
       .createGame(gameId, new BN(1), WAGER)
       .accountsPartial({
         authority: authority.publicKey,
         game: gamePda,
-        ...getHandAccounts(gameId),
+        permission: permAccounts.permission,
+        permDelegationBuffer: permAccounts.permDelegationBuffer,
+        permDelegationRecord: permAccounts.permDelegationRecord,
+        permDelegationMetadata: permAccounts.permDelegationMetadata,
+        validator: ER_VALIDATOR,
+        permissionProgram: new PublicKey(PERMISSION_PROGRAM_ID),
+        delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
         systemProgram: SystemProgram.programId,
       })
       .signers([authority])
-      .rpc();
+      .rpc({ skipPreflight: true });
 
     const game = await baseProgram.account.gameState.fetch(gamePda);
     expect(game.playerCount).to.equal(0);
     expect(JSON.stringify(game.phase)).to.equal(
       JSON.stringify({ waiting: {} })
     );
-    console.log("Game created with 6 hand PDAs (no players yet)");
+    console.log("Game created (permission set up for GameState)");
   });
 
-  it("players join game", async () => {
+  it("players join game (init hand + delegate)", async () => {
     for (let i = 0; i < playerKeys.length; i++) {
       const handPda = deriveHandPda(gameId, i)[0];
-      const delegAccounts = getDelegationAccounts(handPda, baseProgram.programId);
+      const handPermAccounts =
+        getPermissionDelegationAccounts(handPda);
 
       await baseProgram.methods
         .joinGame(gameId, i, playerKeys[i])
@@ -180,24 +161,32 @@ describe("agent_poker_game_er", () => {
           payer: authority.publicKey,
           game: gamePda,
           playerHand: handPda,
-          permission: delegAccounts.permission,
-          permDelegationBuffer: delegAccounts.permDelegationBuffer,
-          permDelegationRecord: delegAccounts.permDelegationRecord,
-          permDelegationMetadata: delegAccounts.permDelegationMetadata,
+          handPermission: handPermAccounts.permission,
+          permDelegationBuffer:
+            handPermAccounts.permDelegationBuffer,
+          permDelegationRecord:
+            handPermAccounts.permDelegationRecord,
+          permDelegationMetadata:
+            handPermAccounts.permDelegationMetadata,
           validator: ER_VALIDATOR,
           permissionProgram: new PublicKey(PERMISSION_PROGRAM_ID),
-          systemProgram: SystemProgram.programId,
-          ownerProgram: baseProgram.programId,
           delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
-          bufferPlayerHand: delegAccounts.bufferPlayerHand,
-          delegationRecordPlayerHand: delegAccounts.delegationRecordPlayerHand,
+          systemProgram: SystemProgram.programId,
+          bufferPlayerHand:
+            delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+              handPda,
+              baseProgram.programId
+            ),
+          delegationRecordPlayerHand:
+            delegationRecordPdaFromDelegatedAccount(handPda),
           delegationMetadataPlayerHand:
-            delegAccounts.delegationMetadataPlayerHand,
+            delegationMetadataPdaFromDelegatedAccount(handPda),
+          ownerProgram: baseProgram.programId,
         })
         .signers([authority])
         .rpc({ skipPreflight: true });
 
-      console.log(`Player ${i} joined (hand delegated)`);
+      console.log(`Player ${i} joined (hand created + delegated)`);
     }
 
     const game = await baseProgram.account.gameState.fetch(gamePda);
@@ -205,42 +194,25 @@ describe("agent_poker_game_er", () => {
     console.log(`${playerKeys.length} players joined`);
   });
 
-  it("delegates empty hand PDAs to ER", async () => {
-    for (let i = playerKeys.length; i < 6; i++) {
-      const handPda = deriveHandPda(gameId, i)[0];
-      await baseProgram.methods
-        .delegatePda({ playerHand: { gameId, seatIndex: i } })
-        .accountsPartial({
-          payer: authority.publicKey,
-          pda: handPda,
-          validator: ER_VALIDATOR,
-        })
-        .signers([authority])
-        .rpc({ skipPreflight: true });
-      console.log(`Empty hand ${i} delegated`);
-    }
-  });
-
   it("starts game (delegates GameState to ER)", async () => {
-    const delegAccounts = getGameDelegationAccounts(gamePda);
-
     await baseProgram.methods
       .startGame(gameId)
       .accountsPartial({
         payer: authority.publicKey,
         game: gamePda,
-        permission: delegAccounts.permission,
-        permDelegationBuffer: delegAccounts.permDelegationBuffer,
-        permDelegationRecord: delegAccounts.permDelegationRecord,
-        permDelegationMetadata: delegAccounts.permDelegationMetadata,
+        bufferGame:
+          delegateBufferPdaFromDelegatedAccountAndOwnerProgram(
+            gamePda,
+            baseProgram.programId
+          ),
+        delegationRecordGame:
+          delegationRecordPdaFromDelegatedAccount(gamePda),
+        delegationMetadataGame:
+          delegationMetadataPdaFromDelegatedAccount(gamePda),
         validator: ER_VALIDATOR,
-        permissionProgram: new PublicKey(PERMISSION_PROGRAM_ID),
         systemProgram: SystemProgram.programId,
         ownerProgram: baseProgram.programId,
         delegationProgram: new PublicKey(DELEGATION_PROGRAM_ID),
-        bufferGame: delegAccounts.bufferGame,
-        delegationRecordGame: delegAccounts.delegationRecordGame,
-        delegationMetadataGame: delegAccounts.delegationMetadataGame,
       })
       .signers([authority])
       .rpc({ skipPreflight: true });
@@ -250,7 +222,8 @@ describe("agent_poker_game_er", () => {
     console.log("Waiting for accounts on ER...");
     for (let i = 0; i < 30; i++) {
       try {
-        const info = await erProvider.connection.getAccountInfo(gamePda);
+        const info =
+          await erProvider.connection.getAccountInfo(gamePda);
         if (info) {
           console.log("Game account available on ER");
           break;
@@ -267,8 +240,8 @@ describe("agent_poker_game_er", () => {
         payer: authority.publicKey,
         game: gamePda,
         authority: authority.publicKey,
-        ...getHandAccounts(gameId),
       })
+      .remainingAccounts(getHandMetas(gameId, playerKeys.length))
       .rpc({ skipPreflight: true });
     console.log("VRF shuffle requested");
 
@@ -276,18 +249,24 @@ describe("agent_poker_game_er", () => {
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const game = await (erProgram.account as any).gameState.fetch(gamePda);
+        const game = await (erProgram.account as any).gameState.fetch(
+          gamePda
+        );
         const phase = JSON.stringify(game.phase);
         if (phase !== JSON.stringify({ waiting: {} })) {
           console.log("VRF callback completed, phase:", phase);
           expect(phase).to.equal(JSON.stringify({ preflop: {} }));
 
-          const hand0 = await (erProgram.account as any).playerHand.fetch(
-            deriveHandPda(gameId, 0)[0]
-          );
+          const hand0 = await (
+            erProgram.account as any
+          ).playerHand.fetch(deriveHandPda(gameId, 0)[0]);
           expect(hand0.hand[0]).to.not.equal(255);
           expect(hand0.hand[1]).to.not.equal(255);
-          console.log("Player 0 dealt:", hand0.hand[0], hand0.hand[1]);
+          console.log(
+            "Player 0 dealt:",
+            hand0.hand[0],
+            hand0.hand[1]
+          );
 
           expect(game.pot.toNumber()).to.be.greaterThan(0);
           console.log("Pot after blinds:", game.pot.toNumber());
@@ -295,11 +274,15 @@ describe("agent_poker_game_er", () => {
         }
       } catch {}
     }
-    throw new Error("VRF callback did not complete within 120 seconds");
+    throw new Error(
+      "VRF callback did not complete within 120 seconds"
+    );
   });
 
   it("executes player fold on ER to trigger showdown", async () => {
-    const game = await (erProgram.account as any).gameState.fetch(gamePda);
+    const game = await (erProgram.account as any).gameState.fetch(
+      gamePda
+    );
     const currentPlayer = game.currentPlayer;
     console.log(`Current player index: ${currentPlayer}`);
 
@@ -311,7 +294,9 @@ describe("agent_poker_game_er", () => {
       })
       .rpc({ skipPreflight: true });
 
-    const gameAfter = await (erProgram.account as any).gameState.fetch(gamePda);
+    const gameAfter = await (erProgram.account as any).gameState.fetch(
+      gamePda
+    );
     expect(JSON.stringify(gameAfter.phase)).to.equal(
       JSON.stringify({ showdown: {} })
     );
@@ -324,11 +309,13 @@ describe("agent_poker_game_er", () => {
       .accountsPartial({
         authority: authority.publicKey,
         game: gamePda,
-        ...getHandAccounts(gameId),
       })
+      .remainingAccounts(getHandMetas(gameId, playerKeys.length))
       .rpc({ skipPreflight: true });
 
-    const game = await (erProgram.account as any).gameState.fetch(gamePda);
+    const game = await (erProgram.account as any).gameState.fetch(
+      gamePda
+    );
     expect(JSON.stringify(game.phase)).to.equal(
       JSON.stringify({ complete: {} })
     );
@@ -353,9 +340,11 @@ describe("agent_poker_game_er", () => {
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 2000));
       try {
-        const game = await baseProgram.account.gameState.fetch(gamePda);
+        const game =
+          await baseProgram.account.gameState.fetch(gamePda);
         if (
-          JSON.stringify(game.phase) === JSON.stringify({ complete: {} })
+          JSON.stringify(game.phase) ===
+          JSON.stringify({ complete: {} })
         ) {
           console.log("Game state verified on base layer!");
           expect(game.winnerIndex).to.be.lessThan(2);
@@ -367,6 +356,8 @@ describe("agent_poker_game_er", () => {
         }
       } catch {}
     }
-    throw new Error("Game state did not settle on base layer within 120s");
+    throw new Error(
+      "Game state did not settle on base layer within 120s"
+    );
   });
 });

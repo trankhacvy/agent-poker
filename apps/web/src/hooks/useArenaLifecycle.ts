@@ -1,10 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GameStateSnapshot, GameAction } from "@/lib/types";
-import type { ArenaAgentConfig, ArenaState, ArenaPoolData } from "@/lib/arena-types";
+import type { ArenaAgentConfig, ArenaState } from "@/lib/arena-types";
 import { GAME_SERVER_URL, GAME_SERVER_WS_URL } from "@/lib/constants";
-import { adaptWsMessage } from "@/lib/adapters";
+
+export interface AgentActionEvent {
+  id: string;
+  seatIndex: number;
+  playerName: string;
+  action: string;
+  amount: number;
+  timestamp: number;
+  reasoning?: string;
+}
 
 interface LastWinner {
   name: string;
@@ -12,30 +20,32 @@ interface LastWinner {
   pot: number;
 }
 
-export interface UseArenaWebSocketReturn {
+export interface UseArenaLifecycleReturn {
   arenaState: ArenaState;
-  gameState: GameStateSnapshot | null;
-  actions: GameAction[];
+  roundNumber: number;
+  tableId: string | null;
+  gameId: string | null;
   agents: ArenaAgentConfig[];
   bettingCountdown: number | null;
   cooldownCountdown: number | null;
-  poolData: ArenaPoolData;
-  roundNumber: number;
+  agentActions: AgentActionEvent[];
   lastWinner: LastWinner | null;
   gameEnded: boolean;
   gateFailedReason: string | null;
   isConnected: boolean;
 }
 
-export function useArenaWebSocket(): UseArenaWebSocketReturn {
+let actionIdCounter = 0;
+
+export function useArenaLifecycle(): UseArenaLifecycleReturn {
   const [arenaState, setArenaState] = useState<ArenaState>("idle");
-  const [gameState, setGameState] = useState<GameStateSnapshot | null>(null);
-  const [actions, setActions] = useState<GameAction[]>([]);
+  const [roundNumber, setRoundNumber] = useState(0);
+  const [tableId, setTableId] = useState<string | null>(null);
+  const [gameId, setGameId] = useState<string | null>(null);
   const [agents, setAgents] = useState<ArenaAgentConfig[]>([]);
   const [bettingCountdown, setBettingCountdown] = useState<number | null>(null);
   const [cooldownCountdown, setCooldownCountdown] = useState<number | null>(null);
-  const [poolData, setPoolData] = useState<ArenaPoolData>({ totalPool: 0, agentPools: {} });
-  const [roundNumber, setRoundNumber] = useState(0);
+  const [agentActions, setAgentActions] = useState<AgentActionEvent[]>([]);
   const [lastWinner, setLastWinner] = useState<LastWinner | null>(null);
   const [gameEnded, setGameEnded] = useState(false);
   const [gateFailedReason, setGateFailedReason] = useState<string | null>(null);
@@ -50,14 +60,16 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
 
     ws.onopen = () => {
       setIsConnected(true);
-      // Subscribe to the arena channel
       ws.send(JSON.stringify({ type: "subscribe", channel: "arena" }));
-      // Fetch current arena status to catch up on missed messages
+
+      // Fetch current arena status to catch up
       fetch(`${GAME_SERVER_URL}/api/arena/status`)
         .then((r) => r.json())
         .then((status: Record<string, unknown>) => {
           if (status.state) setArenaState(status.state as ArenaState);
           if (status.roundNumber) setRoundNumber(status.roundNumber as number);
+          if (status.currentTableId) setTableId(status.currentTableId as string);
+          if (status.currentGameId) setGameId(status.currentGameId as string);
           if (status.bettingSecondsRemaining != null)
             setBettingCountdown(status.bettingSecondsRemaining as number);
           if (status.cooldownSecondsRemaining != null)
@@ -75,21 +87,17 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
         const data = raw.data as Record<string, unknown>;
 
         switch (type) {
-          case "arena_state_change": {
-            setArenaState(data.state as ArenaState);
-            break;
-          }
-          case "arena_betting_open": {
+          case "arena_round_start": {
             setArenaState("betting");
             setRoundNumber(data.roundNumber as number);
+            setTableId(data.tableId as string);
+            setGameId(null);
             setBettingCountdown(data.secondsRemaining as number);
             setAgents(data.agents as ArenaAgentConfig[]);
-            setGameState(null);
-            setActions([]);
+            setAgentActions([]);
             setGameEnded(false);
             setGateFailedReason(null);
             setLastWinner(null);
-            setPoolData({ totalPool: 0, agentPools: {} });
             break;
           }
           case "arena_betting_countdown": {
@@ -99,38 +107,51 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
           case "arena_betting_locked": {
             setBettingCountdown(0);
             setArenaState("playing");
-            break;
-          }
-          case "arena_pool_update": {
-            setPoolData({
-              totalPool: (data.totalPool as number) ?? 0,
-              agentPools: (data.agentPools as Record<string, number>) ?? {},
-            });
+            // Poll for gameId since the game is being created on-chain
+            const pollGameId = () => {
+              fetch(`${GAME_SERVER_URL}/api/arena/status`)
+                .then((r) => r.json())
+                .then((s: Record<string, unknown>) => {
+                  if (s.currentGameId) {
+                    setGameId(s.currentGameId as string);
+                  } else {
+                    setTimeout(pollGameId, 2000);
+                  }
+                })
+                .catch(() => {});
+            };
+            setTimeout(pollGameId, 3000);
             break;
           }
           case "arena_gate_failed": {
             setGateFailedReason(data.reason as string);
             setBettingCountdown(null);
+            setArenaState("refunding");
             break;
           }
-          case "arena_game_complete": {
+          case "arena_agent_action": {
+            const actionEvent: AgentActionEvent = {
+              id: `action-${++actionIdCounter}`,
+              seatIndex: data.seatIndex as number,
+              playerName: data.playerName as string,
+              action: data.action as string,
+              amount: data.amount as number,
+              timestamp: raw.timestamp as number,
+              reasoning: (data.reasoning as string) || undefined,
+            };
+            setAgentActions((prev) => [...prev.slice(-99), actionEvent]);
+            // Track gameId from the message
+            if (raw.gameId) setGameId(raw.gameId as string);
+            break;
+          }
+          case "arena_game_end": {
             setLastWinner({
               name: data.winnerName as string,
               index: data.winnerIndex as number,
               pot: data.pot as number,
             });
             setGameEnded(true);
-            // Update virtual balances
-            if (data.virtualBalances) {
-              setAgents((prev) =>
-                prev.map((a) => ({
-                  ...a,
-                  virtualBalance:
-                    (data.virtualBalances as Record<string, number>)[a.pubkey] ??
-                    a.virtualBalance,
-                }))
-              );
-            }
+            if (raw.gameId) setGameId(raw.gameId as string);
             break;
           }
           case "arena_game_failed": {
@@ -139,33 +160,10 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
           }
           case "arena_cooldown": {
             setCooldownCountdown(data.secondsRemaining as number);
+            setArenaState("cooldown");
             break;
           }
           case "arena_error": {
-            break;
-          }
-          // Also handle game_state/game_action/game_start/game_end from the game broadcast
-          // (these come via the arena channel because ArenaManager subscribes game to arena channel too)
-          case "game_state":
-          case "game_action":
-          case "game_start": {
-            const adapted = adaptWsMessage(raw);
-            if (adapted.gameState) {
-              setGameState(adapted.gameState);
-            }
-            if (adapted.action) {
-              setActions((prev) => [...prev.slice(-99), adapted.action!]);
-            }
-            if (type === "game_start") {
-              setGameEnded(false);
-            }
-            break;
-          }
-          case "game_end": {
-            const adapted = adaptWsMessage(raw);
-            if (adapted.gameState) {
-              setGameState(adapted.gameState);
-            }
             break;
           }
           case "subscribe_ack":
@@ -198,13 +196,13 @@ export function useArenaWebSocket(): UseArenaWebSocketReturn {
 
   return {
     arenaState,
-    gameState,
-    actions,
+    roundNumber,
+    tableId,
+    gameId,
     agents,
     bettingCountdown,
     cooldownCountdown,
-    poolData,
-    roundNumber,
+    agentActions,
     lastWinner,
     gameEnded,
     gateFailedReason,

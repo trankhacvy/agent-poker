@@ -1,7 +1,7 @@
 "use client";
 
 import { LazyMotion, domAnimation } from "motion/react";
-import { useArenaWebSocket } from "@/hooks/useArenaWebSocket";
+import { useArenaLifecycle } from "@/hooks/useArenaLifecycle";
 import { useStats } from "@/hooks/queries";
 import { Separator } from "@/components/ui/separator";
 import StatsSection, { buildStats } from "@/components/home/StatsSection";
@@ -10,7 +10,7 @@ import FaqSection from "@/components/home/FaqSection";
 import LiveArena from "@/components/home/LiveArena";
 
 export default function Home() {
-  const arena = useArenaWebSocket();
+  const arena = useArenaLifecycle();
   const { data: liveStats } = useStats();
   const stats = buildStats(liveStats ?? null);
 
@@ -21,12 +21,12 @@ export default function Home() {
           <LiveArena
             arenaState={arena.arenaState}
             agents={arena.agents}
-            gameState={arena.gameState}
-            actions={arena.actions}
+            agentActions={arena.agentActions}
             bettingCountdown={arena.bettingCountdown}
             cooldownCountdown={arena.cooldownCountdown}
-            poolData={arena.poolData}
             roundNumber={arena.roundNumber}
+            tableId={arena.tableId}
+            gameId={arena.gameId}
             lastWinner={arena.lastWinner}
             gameEnded={arena.gameEnded}
             gateFailedReason={arena.gateFailedReason}

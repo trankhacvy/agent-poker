@@ -1,9 +1,8 @@
 use anchor_lang::prelude::*;
 use ephemeral_rollups_sdk::access_control::instructions::{
-    CreatePermissionCpiBuilder, UpdatePermissionCpiBuilder,
-    DelegatePermissionCpiBuilder
+    CreatePermissionCpiBuilder, DelegatePermissionCpiBuilder, UpdatePermissionCpiBuilder,
 };
-use ephemeral_rollups_sdk::access_control::structs::{Member, MembersArgs};
+use ephemeral_rollups_sdk::access_control::structs::MembersArgs;
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::consts::PERMISSION_PROGRAM_ID;
 use ephemeral_rollups_sdk::cpi::DelegateConfig;
@@ -20,15 +19,28 @@ pub const GAME_SEED: &[u8] = b"poker_game";
 pub const HAND_SEED: &[u8] = b"player_hand";
 
 pub const MAX_PLAYERS: usize = 6;
-pub const SMALL_BLIND_RATIO: u64 = 50; // 5%  of wager_tier
-pub const BIG_BLIND_RATIO: u64 = 100; // 10% of wager_tier
+pub const SMALL_BLIND_RATIO: u64 = 50;
+pub const BIG_BLIND_RATIO: u64 = 100;
 pub const RATIO_BASE: u64 = 1000;
+
+/// Byte offset of the `hand` field inside a serialized PlayerHand account.
+/// Layout after 8-byte Anchor discriminator: game_id(8) + player(32) = 40 → hand starts at 48.
+const HAND_OFFSET: usize = 48;
+/// Byte offset of the `bump` field inside a serialized PlayerHand account.
+const BUMP_OFFSET: usize = 50;
 
 #[ephemeral]
 #[program]
 pub mod agent_poker_game {
     use super::*;
 
+    // =========================================================================
+    // PRODUCTION INSTRUCTIONS (with MagicBlock ER / delegation)
+    // =========================================================================
+
+    /// Create a new game. Initialises GameState on L1 and sets up its permission
+    /// for later delegation. Does NOT create any PlayerHand accounts — those are
+    /// created one-by-one in `join_game`.
     pub fn create_game(
         ctx: Context<CreateGame>,
         game_id: u64,
@@ -60,39 +72,45 @@ pub mod agent_poker_game {
             game.player_bets[i] = 0;
         }
 
-        ctx.accounts.hand0.game_id = game_id;
-        ctx.accounts.hand0.player = Pubkey::default();
-        ctx.accounts.hand0.hand = [255u8; 2];
-        ctx.accounts.hand0.bump = ctx.bumps.hand0;
+        // CPI: create permission for GameState PDA
+        let game_id_bytes = game_id.to_le_bytes();
+        let game_bump = [ctx.bumps.game];
+        let pda_signer: &[&[u8]] = &[GAME_SEED, game_id_bytes.as_ref(), game_bump.as_ref()];
 
-        ctx.accounts.hand1.game_id = game_id;
-        ctx.accounts.hand1.player = Pubkey::default();
-        ctx.accounts.hand1.hand = [255u8; 2];
-        ctx.accounts.hand1.bump = ctx.bumps.hand1;
+        let game_info = ctx.accounts.game.to_account_info();
+        let perm_info = ctx.accounts.permission.to_account_info();
+        let payer_info = ctx.accounts.authority.to_account_info();
+        let sys_info = ctx.accounts.system_program.to_account_info();
+        let perm_prog = ctx.accounts.permission_program.to_account_info();
 
-        ctx.accounts.hand2.game_id = game_id;
-        ctx.accounts.hand2.player = Pubkey::default();
-        ctx.accounts.hand2.hand = [255u8; 2];
-        ctx.accounts.hand2.bump = ctx.bumps.hand2;
+        CreatePermissionCpiBuilder::new(&perm_prog)
+            .permissioned_account(&game_info)
+            .permission(&perm_info)
+            .payer(&payer_info)
+            .system_program(&sys_info)
+            .args(MembersArgs { members: None })
+            .invoke_signed(&[pda_signer])?;
 
-        ctx.accounts.hand3.game_id = game_id;
-        ctx.accounts.hand3.player = Pubkey::default();
-        ctx.accounts.hand3.hand = [255u8; 2];
-        ctx.accounts.hand3.bump = ctx.bumps.hand3;
-
-        ctx.accounts.hand4.game_id = game_id;
-        ctx.accounts.hand4.player = Pubkey::default();
-        ctx.accounts.hand4.hand = [255u8; 2];
-        ctx.accounts.hand4.bump = ctx.bumps.hand4;
-
-        ctx.accounts.hand5.game_id = game_id;
-        ctx.accounts.hand5.player = Pubkey::default();
-        ctx.accounts.hand5.hand = [255u8; 2];
-        ctx.accounts.hand5.bump = ctx.bumps.hand5;
+        // CPI: delegate the permission account
+        DelegatePermissionCpiBuilder::new(&perm_prog)
+            .payer(&payer_info)
+            .authority(&game_info, true)
+            .permissioned_account(&game_info, false)
+            .permission(&perm_info)
+            .system_program(&sys_info)
+            .owner_program(&perm_prog)
+            .delegation_buffer(&ctx.accounts.perm_delegation_buffer)
+            .delegation_record(&ctx.accounts.perm_delegation_record)
+            .delegation_metadata(&ctx.accounts.perm_delegation_metadata)
+            .delegation_program(&ctx.accounts.delegation_program)
+            .validator(Some(&ctx.accounts.validator))
+            .invoke_signed(&[pda_signer])?;
 
         Ok(())
     }
 
+    /// A player joins the game. Creates the PlayerHand account, sets up its
+    /// permission, and delegates the hand to the Ephemeral Rollup.
     pub fn join_game(
         ctx: Context<JoinGame>,
         game_id: u64,
@@ -114,49 +132,58 @@ pub mod agent_poker_game {
         game.player_status[seat_index as usize] = PlayerStatus::Active as u8;
         game.player_count += 1;
 
-        ctx.accounts.player_hand.player = player;
+        // Initialise the hand
+        let hand = &mut ctx.accounts.player_hand;
+        hand.game_id = game_id;
+        hand.player = player;
+        hand.hand = [255u8; 2];
+        hand.bump = ctx.bumps.player_hand;
 
+        // Build signer seeds for the hand PDA
         let game_id_bytes = game_id.to_le_bytes();
         let seat_byte = [seat_index];
-        let hand_bump = [ctx.accounts.player_hand.bump];
-        let pda_signer_seeds: &[&[u8]] = &[
+        let hand_bump = [ctx.bumps.player_hand];
+        let hand_signer: &[&[u8]] = &[
             HAND_SEED,
             game_id_bytes.as_ref(),
             seat_byte.as_ref(),
             hand_bump.as_ref(),
         ];
 
-        let payer_info = ctx.accounts.payer.to_account_info();
         let hand_info = ctx.accounts.player_hand.to_account_info();
-        let perm_info = ctx.accounts.permission.to_account_info();
+        let perm_info = ctx.accounts.hand_permission.to_account_info();
+        let payer_info = ctx.accounts.payer.to_account_info();
         let sys_info = ctx.accounts.system_program.to_account_info();
-        let perm_prog_info = ctx.accounts.permission_program.to_account_info();
-        let deleg_prog_info = ctx.accounts.delegation_program.to_account_info();
+        let perm_prog = ctx.accounts.permission_program.to_account_info();
 
-        CreatePermissionCpiBuilder::new(&perm_prog_info)
+        // CPI: create permission for the hand PDA
+        CreatePermissionCpiBuilder::new(&perm_prog)
             .permissioned_account(&hand_info)
             .permission(&perm_info)
             .payer(&payer_info)
             .system_program(&sys_info)
             .args(MembersArgs { members: None })
-            .invoke_signed(&[pda_signer_seeds])?;
+            .invoke_signed(&[hand_signer])?;
 
-        DelegatePermissionCpiBuilder::new(&perm_prog_info)
+        // CPI: delegate the hand's permission
+        DelegatePermissionCpiBuilder::new(&perm_prog)
             .payer(&payer_info)
             .authority(&hand_info, true)
             .permissioned_account(&hand_info, false)
             .permission(&perm_info)
             .system_program(&sys_info)
-            .owner_program(&perm_prog_info)
+            .owner_program(&perm_prog)
             .delegation_buffer(&ctx.accounts.perm_delegation_buffer)
             .delegation_record(&ctx.accounts.perm_delegation_record)
             .delegation_metadata(&ctx.accounts.perm_delegation_metadata)
-            .delegation_program(&deleg_prog_info)
+            .delegation_program(&ctx.accounts.delegation_program)
             .validator(Some(&ctx.accounts.validator))
-            .invoke_signed(&[pda_signer_seeds])?;
+            .invoke_signed(&[hand_signer])?;
 
+        // Flush hand data before delegation
         ctx.accounts.player_hand.exit(&crate::ID)?;
 
+        // Delegate the hand account itself to ER
         let pda_seeds: &[&[u8]] = &[HAND_SEED, game_id_bytes.as_ref(), seat_byte.as_ref()];
         ctx.accounts.delegate_player_hand(
             &ctx.accounts.payer,
@@ -170,47 +197,16 @@ pub mod agent_poker_game {
         Ok(())
     }
 
+    /// Delegate GameState to the Ephemeral Rollup. Called after all players have
+    /// joined. Permission was already created/delegated in `create_game`.
     pub fn start_game(ctx: Context<StartGame>, game_id: u64) -> Result<()> {
         let game = &ctx.accounts.game;
         require!(game.phase == GamePhase::Waiting, GameError::InvalidPhase);
         require!(game.player_count >= 2, GameError::InvalidPlayerCount);
 
-        let game_id_bytes = game_id.to_le_bytes();
-        let game_bump = [game.bump];
-        let pda_signer_seeds: &[&[u8]] =
-            &[GAME_SEED, game_id_bytes.as_ref(), game_bump.as_ref()];
-
-        let payer_info = ctx.accounts.payer.to_account_info();
-        let game_info = ctx.accounts.game.to_account_info();
-        let perm_info = ctx.accounts.permission.to_account_info();
-        let sys_info = ctx.accounts.system_program.to_account_info();
-        let perm_prog_info = ctx.accounts.permission_program.to_account_info();
-        let deleg_prog_info = ctx.accounts.delegation_program.to_account_info();
-
-        CreatePermissionCpiBuilder::new(&perm_prog_info)
-            .permissioned_account(&game_info)
-            .permission(&perm_info)
-            .payer(&payer_info)
-            .system_program(&sys_info)
-            .args(MembersArgs { members: None })
-            .invoke_signed(&[pda_signer_seeds])?;
-
-        DelegatePermissionCpiBuilder::new(&perm_prog_info)
-            .payer(&payer_info)
-            .authority(&game_info, true)
-            .permissioned_account(&game_info, false)
-            .permission(&perm_info)
-            .system_program(&sys_info)
-            .owner_program(&perm_prog_info)
-            .delegation_buffer(&ctx.accounts.perm_delegation_buffer)
-            .delegation_record(&ctx.accounts.perm_delegation_record)
-            .delegation_metadata(&ctx.accounts.perm_delegation_metadata)
-            .delegation_program(&deleg_prog_info)
-            .validator(Some(&ctx.accounts.validator))
-            .invoke_signed(&[pda_signer_seeds])?;
-
         ctx.accounts.game.exit(&crate::ID)?;
 
+        let game_id_bytes = game_id.to_le_bytes();
         let pda_seeds: &[&[u8]] = &[GAME_SEED, game_id_bytes.as_ref()];
         ctx.accounts.delegate_game(
             &ctx.accounts.payer,
@@ -224,145 +220,36 @@ pub mod agent_poker_game {
         Ok(())
     }
 
-    pub fn create_game_test(
-        ctx: Context<CreateGameTest>,
-        game_id: u64,
-        table_id: u64,
-        players: Vec<Pubkey>,
-        wager_tier: u64,
-    ) -> Result<()> {
-        let player_count = players.len();
-        require!(
-            player_count >= 2 && player_count <= MAX_PLAYERS,
-            GameError::InvalidPlayerCount
-        );
-
-        let game = &mut ctx.accounts.game;
-        game.game_id = game_id;
-        game.table_id = table_id;
-        game.player_count = player_count as u8;
-        game.wager_tier = wager_tier;
-        game.phase = GamePhase::Waiting;
-        game.pot = 0;
-        game.current_bet = 0;
-        game.dealer_index = 0;
-        game.current_player = 0;
-        game.last_raiser = 0;
-        game.community_cards = [255u8; 5];
-        game.community_count = 0;
-        game.winner_index = 255;
-        game.authority = ctx.accounts.authority.key();
-        game.bump = ctx.bumps.game;
-        game.created_at = Clock::get()?.unix_timestamp;
-        game.last_action_at = game.created_at;
-
-        for i in 0..MAX_PLAYERS {
-            if i < player_count {
-                game.players[i] = players[i];
-                game.player_status[i] = PlayerStatus::Active as u8;
-            } else {
-                game.players[i] = Pubkey::default();
-                game.player_status[i] = PlayerStatus::Empty as u8;
-            }
-            game.player_bets[i] = 0;
-        }
-
-        let player_keys: [Pubkey; 6] = core::array::from_fn(|i| {
-            if i < player_count {
-                players[i]
-            } else {
-                Pubkey::default()
-            }
-        });
-
-        ctx.accounts.hand0.game_id = game_id;
-        ctx.accounts.hand0.player = player_keys[0];
-        ctx.accounts.hand0.hand = [255u8; 2];
-        ctx.accounts.hand0.bump = ctx.bumps.hand0;
-
-        ctx.accounts.hand1.game_id = game_id;
-        ctx.accounts.hand1.player = player_keys[1];
-        ctx.accounts.hand1.hand = [255u8; 2];
-        ctx.accounts.hand1.bump = ctx.bumps.hand1;
-
-        ctx.accounts.hand2.game_id = game_id;
-        ctx.accounts.hand2.player = player_keys[2];
-        ctx.accounts.hand2.hand = [255u8; 2];
-        ctx.accounts.hand2.bump = ctx.bumps.hand2;
-
-        ctx.accounts.hand3.game_id = game_id;
-        ctx.accounts.hand3.player = player_keys[3];
-        ctx.accounts.hand3.hand = [255u8; 2];
-        ctx.accounts.hand3.bump = ctx.bumps.hand3;
-
-        ctx.accounts.hand4.game_id = game_id;
-        ctx.accounts.hand4.player = player_keys[4];
-        ctx.accounts.hand4.hand = [255u8; 2];
-        ctx.accounts.hand4.bump = ctx.bumps.hand4;
-
-        ctx.accounts.hand5.game_id = game_id;
-        ctx.accounts.hand5.player = player_keys[5];
-        ctx.accounts.hand5.hand = [255u8; 2];
-        ctx.accounts.hand5.bump = ctx.bumps.hand5;
-
-        Ok(())
-    }
-
-    pub fn delegate_pda(ctx: Context<DelegatePda>, account_type: AccountType) -> Result<()> {
-        let seed_data = derive_seeds(&account_type);
-        let seeds_refs: Vec<&[u8]> = seed_data.iter().map(|s| s.as_slice()).collect();
-
-        let validator = ctx.accounts.validator.as_ref().map(|v| v.key());
-        ctx.accounts.delegate_pda(
-            &ctx.accounts.payer,
-            &seeds_refs,
-            DelegateConfig {
-                validator,
-                ..Default::default()
-            },
-        )?;
-        Ok(())
-    }
-
-    pub fn create_permission(
-        ctx: Context<CreatePermission>,
-        account_type: AccountType,
-        members: Option<Vec<Member>>,
-    ) -> Result<()> {
-        let CreatePermission {
-            permissioned_account,
-            permission,
-            payer,
-            permission_program,
-            system_program,
-        } = ctx.accounts;
-
-        let seed_data = derive_seeds(&account_type);
-        let (_, bump) = Pubkey::find_program_address(
-            &seed_data.iter().map(|s| s.as_slice()).collect::<Vec<_>>(),
-            &crate::ID,
-        );
-
-        let mut seeds = seed_data.clone();
-        seeds.push(vec![bump]);
-        let seed_refs: Vec<&[u8]> = seeds.iter().map(|s| s.as_slice()).collect();
-
-        CreatePermissionCpiBuilder::new(&permission_program)
-            .permissioned_account(&permissioned_account.to_account_info())
-            .permission(&permission)
-            .payer(&payer)
-            .system_program(&system_program)
-            .args(MembersArgs { members })
-            .invoke_signed(&[seed_refs.as_slice()])?;
-
-        Ok(())
-    }
-
+    /// Request a VRF shuffle. Hand PDAs are passed via remaining_accounts.
     pub fn request_shuffle(ctx: Context<RequestShuffle>, client_seed: u8) -> Result<()> {
         require!(
             ctx.accounts.game.phase == GamePhase::Waiting,
             GameError::InvalidPhase
         );
+
+        let player_count = ctx.accounts.game.player_count as usize;
+        require!(
+            ctx.remaining_accounts.len() == player_count,
+            GameError::InvalidHandCount
+        );
+
+        // Build callback account metas: game + N hands
+        let mut callback_accounts = vec![SerializableAccountMeta {
+            pubkey: ctx.accounts.game.key(),
+            is_signer: false,
+            is_writable: true,
+        }];
+
+        let game_id_bytes = ctx.accounts.game.game_id.to_le_bytes();
+        for i in 0..player_count {
+            let hand_info = &ctx.remaining_accounts[i];
+            verify_hand_pda(hand_info.key, &game_id_bytes, i as u8)?;
+            callback_accounts.push(SerializableAccountMeta {
+                pubkey: hand_info.key(),
+                is_signer: false,
+                is_writable: true,
+            });
+        }
 
         let ix = create_request_randomness_ix(RequestRandomnessParams {
             payer: ctx.accounts.payer.key(),
@@ -370,43 +257,7 @@ pub mod agent_poker_game {
             callback_program_id: ID,
             callback_discriminator: instruction::CallbackShuffle::DISCRIMINATOR.to_vec(),
             caller_seed: [client_seed; 32],
-            accounts_metas: Some(vec![
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.game.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand0.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand1.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand2.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand3.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand4.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-                SerializableAccountMeta {
-                    pubkey: ctx.accounts.hand5.key(),
-                    is_signer: false,
-                    is_writable: true,
-                },
-            ]),
+            accounts_metas: Some(callback_accounts),
             ..Default::default()
         });
 
@@ -415,30 +266,43 @@ pub mod agent_poker_game {
         Ok(())
     }
 
+    /// VRF callback: shuffle deck, deal cards, post blinds.
+    /// Hand accounts arrive via remaining_accounts (set during request_shuffle).
     pub fn callback_shuffle(ctx: Context<CallbackShuffle>, randomness: [u8; 32]) -> Result<()> {
         let game = &mut ctx.accounts.game;
+        let player_count = game.player_count as usize;
+        require!(
+            ctx.remaining_accounts.len() == player_count,
+            GameError::InvalidHandCount
+        );
 
+        // Fisher-Yates shuffle
         let mut deck = [0u8; 52];
         for i in 0..52u8 {
             deck[i as usize] = i;
         }
-
         for i in (1..52usize).rev() {
-            let j = ephemeral_vrf_sdk::rnd::random_u8_with_range(&randomness, 0, i as u8) as usize;
+            let j =
+                ephemeral_vrf_sdk::rnd::random_u8_with_range(&randomness, 0, i as u8) as usize;
             deck.swap(i, j);
         }
-
         game.deck = deck;
 
-        ctx.accounts.hand0.hand = [deck[0], deck[1]];
-        ctx.accounts.hand1.hand = [deck[2], deck[3]];
-        ctx.accounts.hand2.hand = [deck[4], deck[5]];
-        ctx.accounts.hand3.hand = [deck[6], deck[7]];
-        ctx.accounts.hand4.hand = [deck[8], deck[9]];
-        ctx.accounts.hand5.hand = [deck[10], deck[11]];
+        // Deal 2 cards to each player via remaining_accounts
+        let game_id_bytes = game.game_id.to_le_bytes();
+        for i in 0..player_count {
+            let hand_info = &ctx.remaining_accounts[i];
+            verify_hand_pda(hand_info.key, &game_id_bytes, i as u8)?;
+            let mut data = hand_info.try_borrow_mut_data()?;
+            data[HAND_OFFSET] = deck[i * 2];
+            data[HAND_OFFSET + 1] = deck[i * 2 + 1];
+        }
 
-        game.community_cards = [deck[12], deck[13], deck[14], deck[15], deck[16]];
+        // Community cards
+        let c = player_count * 2;
+        game.community_cards = [deck[c], deck[c + 1], deck[c + 2], deck[c + 3], deck[c + 4]];
 
+        // Blinds
         let small_blind = game
             .wager_tier
             .checked_mul(SMALL_BLIND_RATIO)
@@ -471,7 +335,12 @@ pub mod agent_poker_game {
         Ok(())
     }
 
-    pub fn player_action(ctx: Context<PlayerAction>, action: u8, raise_amount: u64) -> Result<()> {
+    /// Submit a player action (fold / check / call / raise / all-in).
+    pub fn player_action(
+        ctx: Context<PlayerAction>,
+        action: u8,
+        raise_amount: u64,
+    ) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(
             matches!(
@@ -565,7 +434,9 @@ pub mod agent_poker_game {
         Ok(())
     }
 
-    pub fn showdown(ctx: Context<Showdown>) -> Result<()> {
+    /// Production showdown: update hand permissions, evaluate winner, commit back to L1.
+    /// remaining_accounts layout: [hand_0 .. hand_N, perm_0 .. perm_N]
+    pub fn showdown<'a>(ctx: Context<'_, '_, 'a, 'a, Showdown<'a>>) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(
             game.phase == GamePhase::Showdown
@@ -574,28 +445,35 @@ pub mod agent_poker_game {
             GameError::InvalidPhase
         );
 
+        let player_count = game.player_count as usize;
+        require!(
+            ctx.remaining_accounts.len() == player_count * 2,
+            GameError::InvalidHandCount
+        );
+
+        let hand_accounts = &ctx.remaining_accounts[..player_count];
+        let perm_accounts = &ctx.remaining_accounts[player_count..];
         let permission_program = &ctx.accounts.permission_program.to_account_info();
+        let game_id_bytes = game.game_id.to_le_bytes();
 
-        let hand_infos = [
-            (&ctx.accounts.hand0, &ctx.accounts.permission_hand0),
-            (&ctx.accounts.hand1, &ctx.accounts.permission_hand1),
-            (&ctx.accounts.hand2, &ctx.accounts.permission_hand2),
-            (&ctx.accounts.hand3, &ctx.accounts.permission_hand3),
-            (&ctx.accounts.hand4, &ctx.accounts.permission_hand4),
-            (&ctx.accounts.hand5, &ctx.accounts.permission_hand5),
-        ];
-
-        for (i, (hand_acc, perm_acc)) in hand_infos.iter().enumerate() {
+        // Update permissions for each hand to reveal them
+        for i in 0..player_count {
             if game.player_status[i] == PlayerStatus::Empty as u8 {
                 continue;
             }
-            let game_id_bytes = game.game_id.to_le_bytes();
+            let hand_info = &hand_accounts[i];
+            let perm_info = &perm_accounts[i];
+            verify_hand_pda(hand_info.key, &game_id_bytes, i as u8)?;
+
+            let hand_data = hand_info.try_borrow_data()?;
+            let hand_bump = hand_data[BUMP_OFFSET];
+            drop(hand_data);
+
             let seat_byte = [i as u8];
-            let hand_bump = hand_acc.bump;
             UpdatePermissionCpiBuilder::new(permission_program)
-                .permissioned_account(&hand_acc.to_account_info(), true)
-                .authority(&hand_acc.to_account_info(), false)
-                .permission(&perm_acc.to_account_info())
+                .permissioned_account(hand_info, true)
+                .authority(hand_info, false)
+                .permission(perm_info)
                 .args(MembersArgs { members: None })
                 .invoke_signed(&[&[
                     HAND_SEED,
@@ -605,9 +483,10 @@ pub mod agent_poker_game {
                 ]])?;
         }
 
+        // Evaluate winner
         let active_count = count_active_players(game);
         if active_count == 1 {
-            for i in 0..game.player_count as usize {
+            for i in 0..player_count {
                 let s = game.player_status[i];
                 if s == PlayerStatus::Active as u8 || s == PlayerStatus::AllIn as u8 {
                     game.winner_index = i as u8;
@@ -615,14 +494,12 @@ pub mod agent_poker_game {
                 }
             }
         } else {
-            let hands = [
-                (game.player_status[0], ctx.accounts.hand0.hand),
-                (game.player_status[1], ctx.accounts.hand1.hand),
-                (game.player_status[2], ctx.accounts.hand2.hand),
-                (game.player_status[3], ctx.accounts.hand3.hand),
-                (game.player_status[4], ctx.accounts.hand4.hand),
-                (game.player_status[5], ctx.accounts.hand5.hand),
-            ];
+            let mut hands: Vec<(u8, [u8; 2])> = Vec::with_capacity(player_count);
+            for i in 0..player_count {
+                let data = hand_accounts[i].try_borrow_data()?;
+                let hand = [data[HAND_OFFSET], data[HAND_OFFSET + 1]];
+                hands.push((game.player_status[i], hand));
+            }
             let winner = hand_eval::evaluate_winner(&hands, &game.community_cards);
             game.winner_index = winner as u8;
         }
@@ -649,36 +526,146 @@ pub mod agent_poker_game {
         Ok(())
     }
 
+    /// Commit GameState back to L1 without running showdown logic.
+    pub fn commit_game(ctx: Context<CommitGame>) -> Result<()> {
+        ctx.accounts.game.exit(&crate::ID)?;
+
+        commit_and_undelegate_accounts(
+            &ctx.accounts.payer,
+            vec![&ctx.accounts.game.to_account_info()],
+            &ctx.accounts.magic_context,
+            &ctx.accounts.magic_program,
+        )?;
+
+        Ok(())
+    }
+
+    // =========================================================================
+    // TEST HELPERS (no delegation / no ER)
+    // =========================================================================
+
+    /// Test helper: create a game without setting up permissions or delegation.
+    pub fn create_game_test(
+        ctx: Context<CreateGameTest>,
+        game_id: u64,
+        table_id: u64,
+        wager_tier: u64,
+    ) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        game.game_id = game_id;
+        game.table_id = table_id;
+        game.player_count = 0;
+        game.wager_tier = wager_tier;
+        game.phase = GamePhase::Waiting;
+        game.pot = 0;
+        game.current_bet = 0;
+        game.dealer_index = 0;
+        game.current_player = 0;
+        game.last_raiser = 0;
+        game.community_cards = [255u8; 5];
+        game.community_count = 0;
+        game.winner_index = 255;
+        game.authority = ctx.accounts.authority.key();
+        game.bump = ctx.bumps.game;
+        game.created_at = Clock::get()?.unix_timestamp;
+        game.last_action_at = game.created_at;
+
+        for i in 0..MAX_PLAYERS {
+            game.players[i] = Pubkey::default();
+            game.player_status[i] = PlayerStatus::Empty as u8;
+            game.player_bets[i] = 0;
+        }
+
+        Ok(())
+    }
+
+    /// Test helper: join a game — creates the PlayerHand without delegation.
+    pub fn join_game_test(
+        ctx: Context<JoinGameTest>,
+        game_id: u64,
+        seat_index: u8,
+        player: Pubkey,
+    ) -> Result<()> {
+        let game = &mut ctx.accounts.game;
+        require!(game.phase == GamePhase::Waiting, GameError::InvalidPhase);
+        require!(
+            (seat_index as usize) < MAX_PLAYERS,
+            GameError::InvalidSeatIndex
+        );
+        require!(
+            game.player_status[seat_index as usize] == PlayerStatus::Empty as u8,
+            GameError::SeatTaken
+        );
+
+        game.players[seat_index as usize] = player;
+        game.player_status[seat_index as usize] = PlayerStatus::Active as u8;
+        game.player_count += 1;
+
+        let hand = &mut ctx.accounts.player_hand;
+        hand.game_id = game_id;
+        hand.player = player;
+        hand.hand = [255u8; 2];
+        hand.bump = ctx.bumps.player_hand;
+
+        Ok(())
+    }
+
+    /// Test helper: deal cards from a pre-shuffled deck.
+    /// Hand accounts are passed via remaining_accounts.
     pub fn deal_cards(ctx: Context<DealCards>, deck: Vec<u8>) -> Result<()> {
         require!(deck.len() == 52, GameError::InvalidDeck);
         let game = &mut ctx.accounts.game;
         require!(game.phase == GamePhase::Waiting, GameError::InvalidPhase);
+        let player_count = game.player_count as usize;
+        require!(player_count >= 2, GameError::InvalidPlayerCount);
+        require!(
+            ctx.remaining_accounts.len() == player_count,
+            GameError::InvalidHandCount
+        );
 
         let mut deck_arr = [0u8; 52];
         deck_arr.copy_from_slice(&deck);
         game.deck = deck_arr;
 
-        ctx.accounts.hand0.hand = [deck_arr[0], deck_arr[1]];
-        ctx.accounts.hand1.hand = [deck_arr[2], deck_arr[3]];
-        ctx.accounts.hand2.hand = [deck_arr[4], deck_arr[5]];
-        ctx.accounts.hand3.hand = [deck_arr[6], deck_arr[7]];
-        ctx.accounts.hand4.hand = [deck_arr[8], deck_arr[9]];
-        ctx.accounts.hand5.hand = [deck_arr[10], deck_arr[11]];
+        let game_id_bytes = game.game_id.to_le_bytes();
+        for i in 0..player_count {
+            let hand_info = &ctx.remaining_accounts[i];
+            verify_hand_pda(hand_info.key, &game_id_bytes, i as u8)?;
+            let mut data = hand_info.try_borrow_mut_data()?;
+            data[HAND_OFFSET] = deck_arr[i * 2];
+            data[HAND_OFFSET + 1] = deck_arr[i * 2 + 1];
+        }
 
-        game.community_cards = [deck_arr[12], deck_arr[13], deck_arr[14], deck_arr[15], deck_arr[16]];
+        let c = player_count * 2;
+        game.community_cards = [
+            deck_arr[c],
+            deck_arr[c + 1],
+            deck_arr[c + 2],
+            deck_arr[c + 3],
+            deck_arr[c + 4],
+        ];
 
-        let small_blind = game.wager_tier
-            .checked_mul(SMALL_BLIND_RATIO).ok_or(GameError::MathOverflow)?
-            .checked_div(RATIO_BASE).ok_or(GameError::MathOverflow)?;
-        let big_blind = game.wager_tier
-            .checked_mul(BIG_BLIND_RATIO).ok_or(GameError::MathOverflow)?
-            .checked_div(RATIO_BASE).ok_or(GameError::MathOverflow)?;
+        // Blinds
+        let small_blind = game
+            .wager_tier
+            .checked_mul(SMALL_BLIND_RATIO)
+            .ok_or(GameError::MathOverflow)?
+            .checked_div(RATIO_BASE)
+            .ok_or(GameError::MathOverflow)?;
+        let big_blind = game
+            .wager_tier
+            .checked_mul(BIG_BLIND_RATIO)
+            .ok_or(GameError::MathOverflow)?
+            .checked_div(RATIO_BASE)
+            .ok_or(GameError::MathOverflow)?;
 
         let sb_idx = ((game.dealer_index + 1) % game.player_count) as usize;
         let bb_idx = ((game.dealer_index + 2) % game.player_count) as usize;
         game.player_bets[sb_idx] = small_blind;
         game.player_bets[bb_idx] = big_blind;
-        game.pot = small_blind.checked_add(big_blind).ok_or(GameError::MathOverflow)?;
+        game.pot = small_blind
+            .checked_add(big_blind)
+            .ok_or(GameError::MathOverflow)?;
         game.current_bet = big_blind;
 
         let first = ((game.dealer_index + 3) % game.player_count) as usize;
@@ -691,6 +678,8 @@ pub mod agent_poker_game {
         Ok(())
     }
 
+    /// Test helper: showdown without ER commit or permission updates.
+    /// Hand accounts are passed via remaining_accounts.
     pub fn showdown_test(ctx: Context<ShowdownTest>) -> Result<()> {
         let game = &mut ctx.accounts.game;
         require!(
@@ -700,9 +689,11 @@ pub mod agent_poker_game {
             GameError::InvalidPhase
         );
 
+        let player_count = game.player_count as usize;
         let active_count = count_active_players(game);
+
         if active_count == 1 {
-            for i in 0..game.player_count as usize {
+            for i in 0..player_count {
                 let s = game.player_status[i];
                 if s == PlayerStatus::Active as u8 || s == PlayerStatus::AllIn as u8 {
                     game.winner_index = i as u8;
@@ -710,14 +701,21 @@ pub mod agent_poker_game {
                 }
             }
         } else {
-            let hands = [
-                (game.player_status[0], ctx.accounts.hand0.hand),
-                (game.player_status[1], ctx.accounts.hand1.hand),
-                (game.player_status[2], ctx.accounts.hand2.hand),
-                (game.player_status[3], ctx.accounts.hand3.hand),
-                (game.player_status[4], ctx.accounts.hand4.hand),
-                (game.player_status[5], ctx.accounts.hand5.hand),
-            ];
+            require!(
+                ctx.remaining_accounts.len() == player_count,
+                GameError::InvalidHandCount
+            );
+
+            let game_id_bytes = game.game_id.to_le_bytes();
+            let mut hands: Vec<(u8, [u8; 2])> = Vec::with_capacity(player_count);
+            for i in 0..player_count {
+                let hand_info = &ctx.remaining_accounts[i];
+                verify_hand_pda(hand_info.key, &game_id_bytes, i as u8)?;
+                let data = hand_info.try_borrow_data()?;
+                let hand = [data[HAND_OFFSET], data[HAND_OFFSET + 1]];
+                hands.push((game.player_status[i], hand));
+            }
+
             let winner = hand_eval::evaluate_winner(&hands, &game.community_cards);
             game.winner_index = winner as u8;
         }
@@ -734,19 +732,17 @@ pub mod agent_poker_game {
 
         Ok(())
     }
+}
 
-    pub fn commit_game(ctx: Context<CommitGame>) -> Result<()> {
-        ctx.accounts.game.exit(&crate::ID)?;
+// =============================================================================
+// Helper functions
+// =============================================================================
 
-        commit_and_undelegate_accounts(
-            &ctx.accounts.payer,
-            vec![&ctx.accounts.game.to_account_info()],
-            &ctx.accounts.magic_context,
-            &ctx.accounts.magic_program,
-        )?;
-
-        Ok(())
-    }
+fn verify_hand_pda(key: &Pubkey, game_id_bytes: &[u8], seat: u8) -> Result<()> {
+    let (expected, _) =
+        Pubkey::find_program_address(&[HAND_SEED, game_id_bytes, &[seat]], &crate::ID);
+    require!(*key == expected, GameError::InvalidHandAccount);
+    Ok(())
 }
 
 fn count_non_folded_players(game: &GameState) -> u8 {
@@ -821,23 +817,9 @@ fn advance_phase(game: &mut GameState) -> Result<()> {
     Ok(())
 }
 
-fn derive_seeds(account_type: &AccountType) -> Vec<Vec<u8>> {
-    match account_type {
-        AccountType::Game { game_id } => {
-            vec![GAME_SEED.to_vec(), game_id.to_le_bytes().to_vec()]
-        }
-        AccountType::PlayerHand {
-            game_id,
-            seat_index,
-        } => {
-            vec![
-                HAND_SEED.to_vec(),
-                game_id.to_le_bytes().to_vec(),
-                vec![*seat_index],
-            ]
-        }
-    }
-}
+// =============================================================================
+// Account data structures
+// =============================================================================
 
 #[account]
 pub struct GameState {
@@ -865,8 +847,9 @@ pub struct GameState {
 }
 
 impl GameState {
-    pub const MAX_SIZE: usize = 8 + 8 + 1 + 8 + 1 + 8 + 8 + 1 + 1 + 1
-        + 52 + (32 * 6) + 6 + (8 * 6) + 5 + 1 + 1 + 32 + 1 + 8 + 8;
+    pub const MAX_SIZE: usize =
+        8 + 8 + 1 + 8 + 1 + 8 + 8 + 1 + 1 + 1 + 52 + (32 * 6) + 6 + (8 * 6) + 5 + 1 + 1 + 32
+            + 1 + 8 + 8;
 }
 
 #[account]
@@ -880,6 +863,10 @@ pub struct PlayerHand {
 impl PlayerHand {
     pub const MAX_SIZE: usize = 8 + 32 + 2 + 1;
 }
+
+// =============================================================================
+// Enums
+// =============================================================================
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
 pub enum GamePhase {
@@ -923,11 +910,9 @@ impl ActionType {
     }
 }
 
-#[derive(AnchorSerialize, AnchorDeserialize, Clone)]
-pub enum AccountType {
-    Game { game_id: u64 },
-    PlayerHand { game_id: u64, seat_index: u8 },
-}
+// =============================================================================
+// Account context structs — PRODUCTION
+// =============================================================================
 
 #[derive(Accounts)]
 #[instruction(game_id: u64)]
@@ -944,24 +929,29 @@ pub struct CreateGame<'info> {
     )]
     pub game: Account<'info, GameState>,
 
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(init, payer = authority, space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
+    /// CHECK: Permission PDA for GameState — validated by permission program
+    #[account(mut)]
+    pub permission: UncheckedAccount<'info>,
+
+    /// CHECK: Delegation buffer for the permission PDA
+    #[account(mut)]
+    pub perm_delegation_buffer: AccountInfo<'info>,
+    /// CHECK: Delegation record for the permission PDA
+    #[account(mut)]
+    pub perm_delegation_record: AccountInfo<'info>,
+    /// CHECK: Delegation metadata for the permission PDA
+    #[account(mut)]
+    pub perm_delegation_metadata: AccountInfo<'info>,
+
+    /// CHECK: TEE validator
+    pub validator: AccountInfo<'info>,
+
+    /// CHECK: MagicBlock permission program
+    #[account(address = PERMISSION_PROGRAM_ID)]
+    pub permission_program: UncheckedAccount<'info>,
+
+    /// CHECK: MagicBlock delegation program
+    pub delegation_program: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -982,24 +972,26 @@ pub struct JoinGame<'info> {
     pub game: Account<'info, GameState>,
 
     #[account(
-        mut,
+        init,
+        payer = payer,
+        space = 8 + PlayerHand::MAX_SIZE,
         seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[seat_index]],
-        bump = player_hand.bump,
+        bump,
         del,
     )]
     pub player_hand: Account<'info, PlayerHand>,
 
-    /// CHECK: Permission PDA for the player hand — validated by permission program
+    /// CHECK: Permission PDA for the player hand
     #[account(mut)]
-    pub permission: UncheckedAccount<'info>,
+    pub hand_permission: UncheckedAccount<'info>,
 
-    /// CHECK: Delegation buffer for the permission PDA
+    /// CHECK: Delegation buffer for the hand permission PDA
     #[account(mut)]
     pub perm_delegation_buffer: AccountInfo<'info>,
-    /// CHECK: Delegation record for the permission PDA
+    /// CHECK: Delegation record for the hand permission PDA
     #[account(mut)]
     pub perm_delegation_record: AccountInfo<'info>,
-    /// CHECK: Delegation metadata for the permission PDA
+    /// CHECK: Delegation metadata for the hand permission PDA
     #[account(mut)]
     pub perm_delegation_metadata: AccountInfo<'info>,
 
@@ -1009,6 +1001,9 @@ pub struct JoinGame<'info> {
     /// CHECK: MagicBlock permission program
     #[account(address = PERMISSION_PROGRAM_ID)]
     pub permission_program: UncheckedAccount<'info>,
+
+    /// CHECK: MagicBlock delegation program
+    pub delegation_program: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -1029,121 +1024,9 @@ pub struct StartGame<'info> {
     )]
     pub game: Account<'info, GameState>,
 
-    /// CHECK: Permission PDA for the game — validated by permission program
-    #[account(mut)]
-    pub permission: UncheckedAccount<'info>,
-
-    /// CHECK: Delegation buffer for the permission PDA
-    #[account(mut)]
-    pub perm_delegation_buffer: AccountInfo<'info>,
-    /// CHECK: Delegation record for the permission PDA
-    #[account(mut)]
-    pub perm_delegation_record: AccountInfo<'info>,
-    /// CHECK: Delegation metadata for the permission PDA
-    #[account(mut)]
-    pub perm_delegation_metadata: AccountInfo<'info>,
-
     /// CHECK: TEE validator
     pub validator: AccountInfo<'info>,
 
-    /// CHECK: MagicBlock permission program
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: UncheckedAccount<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-#[instruction(game_id: u64)]
-pub struct CreateGameTest<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + GameState::MAX_SIZE,
-        seeds = [GAME_SEED, game_id.to_le_bytes().as_ref()],
-        bump,
-    )]
-    pub game: Account<'info, GameState>,
-
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[0u8]],
-        bump,
-    )]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[1u8]],
-        bump,
-    )]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[2u8]],
-        bump,
-    )]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[3u8]],
-        bump,
-    )]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[4u8]],
-        bump,
-    )]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(
-        init,
-        payer = authority,
-        space = 8 + PlayerHand::MAX_SIZE,
-        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[5u8]],
-        bump,
-    )]
-    pub hand5: Account<'info, PlayerHand>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[delegate]
-#[derive(Accounts)]
-pub struct DelegatePda<'info> {
-    /// CHECK: The PDA to delegate (either GameState or PlayerHand)
-    #[account(mut, del)]
-    pub pda: AccountInfo<'info>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    /// CHECK: TEE validator — optional, validated by delegation program
-    pub validator: Option<AccountInfo<'info>>,
-}
-
-#[derive(Accounts)]
-pub struct CreatePermission<'info> {
-    /// CHECK: Validated via permission program CPI
-    pub permissioned_account: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA — checked by the permission program
-    #[account(mut)]
-    pub permission: UncheckedAccount<'info>,
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    /// CHECK: MagicBlock permission program
-    #[account(address = PERMISSION_PROGRAM_ID)]
-    pub permission_program: UncheckedAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
@@ -1167,19 +1050,7 @@ pub struct RequestShuffle<'info> {
     /// CHECK: Oracle queue — must be the ephemeral queue for ER-delegated accounts
     #[account(mut, address = ephemeral_vrf_sdk::consts::DEFAULT_EPHEMERAL_QUEUE)]
     pub oracle_queue: AccountInfo<'info>,
-
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
+    // Hand accounts are passed via remaining_accounts
 }
 
 #[derive(Accounts)]
@@ -1190,19 +1061,7 @@ pub struct CallbackShuffle<'info> {
 
     #[account(mut)]
     pub game: Account<'info, GameState>,
-
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
+    // Hand accounts are passed via remaining_accounts
 }
 
 #[derive(Accounts)]
@@ -1231,88 +1090,10 @@ pub struct Showdown<'info> {
     )]
     pub game: Account<'info, GameState>,
 
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
-
-    /// CHECK: Permission PDA for hand0
-    #[account(mut)]
-    pub permission_hand0: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA for hand1
-    #[account(mut)]
-    pub permission_hand1: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA for hand2
-    #[account(mut)]
-    pub permission_hand2: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA for hand3
-    #[account(mut)]
-    pub permission_hand3: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA for hand4
-    #[account(mut)]
-    pub permission_hand4: UncheckedAccount<'info>,
-    /// CHECK: Permission PDA for hand5
-    #[account(mut)]
-    pub permission_hand5: UncheckedAccount<'info>,
-
     /// CHECK: MagicBlock permission program
     #[account(address = PERMISSION_PROGRAM_ID)]
     pub permission_program: UncheckedAccount<'info>,
-}
-
-#[derive(Accounts)]
-pub struct DealCards<'info> {
-    pub authority: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [GAME_SEED, game.game_id.to_le_bytes().as_ref()],
-        bump = game.bump,
-        has_one = authority @ GameError::Unauthorized,
-    )]
-    pub game: Account<'info, GameState>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(mut, seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
-}
-
-#[derive(Accounts)]
-pub struct ShowdownTest<'info> {
-    pub authority: Signer<'info>,
-    #[account(
-        mut,
-        seeds = [GAME_SEED, game.game_id.to_le_bytes().as_ref()],
-        bump = game.bump,
-    )]
-    pub game: Account<'info, GameState>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[0u8]], bump)]
-    pub hand0: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[1u8]], bump)]
-    pub hand1: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[2u8]], bump)]
-    pub hand2: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[3u8]], bump)]
-    pub hand3: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[4u8]], bump)]
-    pub hand4: Account<'info, PlayerHand>,
-    #[account(seeds = [HAND_SEED, game.game_id.to_le_bytes().as_ref(), &[5u8]], bump)]
-    pub hand5: Account<'info, PlayerHand>,
+    // remaining_accounts: [hand_0 .. hand_N, perm_0 .. perm_N]
 }
 
 #[commit]
@@ -1328,6 +1109,83 @@ pub struct CommitGame<'info> {
     pub game: Account<'info, GameState>,
 }
 
+// =============================================================================
+// Account context structs — TEST HELPERS
+// =============================================================================
+
+#[derive(Accounts)]
+#[instruction(game_id: u64)]
+pub struct CreateGameTest<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + GameState::MAX_SIZE,
+        seeds = [GAME_SEED, game_id.to_le_bytes().as_ref()],
+        bump,
+    )]
+    pub game: Account<'info, GameState>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(game_id: u64, seat_index: u8)]
+pub struct JoinGameTest<'info> {
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [GAME_SEED, game_id.to_le_bytes().as_ref()],
+        bump = game.bump,
+        constraint = game.authority == authority.key() @ GameError::Unauthorized,
+    )]
+    pub game: Account<'info, GameState>,
+
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + PlayerHand::MAX_SIZE,
+        seeds = [HAND_SEED, game_id.to_le_bytes().as_ref(), &[seat_index]],
+        bump,
+    )]
+    pub player_hand: Account<'info, PlayerHand>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct DealCards<'info> {
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [GAME_SEED, game.game_id.to_le_bytes().as_ref()],
+        bump = game.bump,
+        has_one = authority @ GameError::Unauthorized,
+    )]
+    pub game: Account<'info, GameState>,
+    // Hand accounts are passed via remaining_accounts
+}
+
+#[derive(Accounts)]
+pub struct ShowdownTest<'info> {
+    pub authority: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [GAME_SEED, game.game_id.to_le_bytes().as_ref()],
+        bump = game.bump,
+    )]
+    pub game: Account<'info, GameState>,
+    // Hand accounts are passed via remaining_accounts
+}
+
+// =============================================================================
+// Events
+// =============================================================================
+
 #[event]
 pub struct GameFinished {
     pub game_id: u64,
@@ -1335,6 +1193,10 @@ pub struct GameFinished {
     pub winner_pubkey: Pubkey,
     pub pot: u64,
 }
+
+// =============================================================================
+// Errors
+// =============================================================================
 
 #[error_code]
 pub enum GameError {
@@ -1360,4 +1222,8 @@ pub enum GameError {
     InvalidSeatIndex,
     #[msg("Seat is already taken")]
     SeatTaken,
+    #[msg("Wrong number of hand accounts in remaining_accounts")]
+    InvalidHandCount,
+    #[msg("Hand account PDA does not match expected derivation")]
+    InvalidHandAccount,
 }

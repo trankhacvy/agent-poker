@@ -6,7 +6,7 @@ export interface ArenaAgentConfig {
   personality: string;
   avatar: string;
   color: string;
-  virtualBalance: number;
+  virtualBalance?: number;
 }
 
 export type ArenaState =
@@ -24,9 +24,4 @@ export interface ArenaStatus {
   agents: ArenaAgentConfig[];
   bettingSecondsRemaining: number | null;
   cooldownSecondsRemaining: number | null;
-}
-
-export interface ArenaPoolData {
-  totalPool: number;
-  agentPools: Record<string, number>;
 }

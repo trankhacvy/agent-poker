@@ -59,15 +59,45 @@ describe("agent_poker_game", () => {
     );
   }
 
-  function getHandAccounts(id: BN) {
-    return {
-      hand0: deriveHandPda(id, 0)[0],
-      hand1: deriveHandPda(id, 1)[0],
-      hand2: deriveHandPda(id, 2)[0],
-      hand3: deriveHandPda(id, 3)[0],
-      hand4: deriveHandPda(id, 4)[0],
-      hand5: deriveHandPda(id, 5)[0],
-    };
+  function getHandMetas(
+    id: BN,
+    count: number
+  ): anchor.web3.AccountMeta[] {
+    return Array.from({ length: count }, (_, i) => ({
+      pubkey: deriveHandPda(id, i)[0],
+      isSigner: false,
+      isWritable: true,
+    }));
+  }
+
+  async function createGameAndJoin(
+    gId: BN,
+    gPda: PublicKey,
+    tableId: BN,
+    players: PublicKey[]
+  ) {
+    await program.methods
+      .createGameTest(gId, tableId, WAGER)
+      .accountsPartial({
+        authority: authority.publicKey,
+        game: gPda,
+        systemProgram: SystemProgram.programId,
+      })
+      .signers([authority])
+      .rpc();
+
+    for (let i = 0; i < players.length; i++) {
+      await program.methods
+        .joinGameTest(gId, i, players[i])
+        .accountsPartial({
+          authority: authority.publicKey,
+          game: gPda,
+          playerHand: deriveHandPda(gId, i)[0],
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([authority])
+        .rpc();
+    }
   }
 
   before(async () => {
@@ -77,20 +107,11 @@ describe("agent_poker_game", () => {
     [gamePda] = deriveGamePda(gameId);
   });
 
-  describe("create_game", () => {
-    it("creates a game with valid players", async () => {
+  describe("create_game + join_game", () => {
+    it("creates a game then joins 6 players", async () => {
       const tableId = new BN(1);
 
-      await program.methods
-        .createGameTest(gameId, tableId, playerKeys, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: gamePda,
-          ...getHandAccounts(gameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      await createGameAndJoin(gameId, gamePda, tableId, playerKeys);
 
       const game = await program.account.gameState.fetch(gamePda);
       expect(game.gameId.toString()).to.equal(gameId.toString());
@@ -121,41 +142,20 @@ describe("agent_poker_game", () => {
       expect(hand0.hand[0]).to.equal(255);
       expect(hand0.hand[1]).to.equal(255);
     });
-
-    it("rejects fewer than 2 players", async () => {
-      const badGameId = new BN(Date.now() + 100);
-      const [badGamePda] = deriveGamePda(badGameId);
-
-      try {
-        await program.methods
-          .createGameTest(badGameId, new BN(1), [playerKeys[0]], WAGER)
-          .accountsPartial({
-            authority: authority.publicKey,
-            game: badGamePda,
-            ...getHandAccounts(badGameId),
-            systemProgram: SystemProgram.programId,
-          })
-          .signers([authority])
-          .rpc();
-        expect.fail("should have thrown");
-      } catch (err) {
-        const anchorErr = err as anchor.AnchorError;
-        expect(anchorErr.error.errorCode.code).to.equal("InvalidPlayerCount");
-      }
-    });
   });
 
   describe("deal_cards", () => {
     it("deals with valid shuffled deck", async () => {
       const deck = generateShuffledDeck();
+      const playerCount = 6;
 
       await program.methods
         .dealCards(Buffer.from(deck))
         .accountsPartial({
           authority: authority.publicKey,
           game: gamePda,
-          ...getHandAccounts(gameId),
         })
+        .remainingAccounts(getHandMetas(gameId, playerCount))
         .signers([authority])
         .rpc();
 
@@ -178,8 +178,9 @@ describe("agent_poker_game", () => {
       expect(hand1.hand[1]).to.equal(deck[3]);
 
       // Verify community cards
+      const c = playerCount * 2;
       for (let j = 0; j < 5; j++) {
-        expect(game.communityCards[j]).to.equal(deck[12 + j]);
+        expect(game.communityCards[j]).to.equal(deck[c + j]);
       }
 
       // Verify blinds
@@ -199,17 +200,12 @@ describe("agent_poker_game", () => {
       [actionGamePda] = deriveGamePda(actionGameId);
 
       const twoPlayers = playerKeys.slice(0, 2);
-
-      await program.methods
-        .createGameTest(actionGameId, new BN(2), twoPlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: actionGamePda,
-          ...getHandAccounts(actionGameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      await createGameAndJoin(
+        actionGameId,
+        actionGamePda,
+        new BN(2),
+        twoPlayers
+      );
 
       const deck = generateShuffledDeck();
       await program.methods
@@ -217,14 +213,15 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: actionGamePda,
-          ...getHandAccounts(actionGameId),
         })
+        .remainingAccounts(getHandMetas(actionGameId, 2))
         .signers([authority])
         .rpc();
     });
 
     it("fold sets player to folded", async () => {
-      const gameBefore = await program.account.gameState.fetch(actionGamePda);
+      const gameBefore =
+        await program.account.gameState.fetch(actionGamePda);
       const currentIdx = gameBefore.currentPlayer;
 
       await program.methods
@@ -236,7 +233,8 @@ describe("agent_poker_game", () => {
         .signers([authority])
         .rpc();
 
-      const gameAfter = await program.account.gameState.fetch(actionGamePda);
+      const gameAfter =
+        await program.account.gameState.fetch(actionGamePda);
       expect(gameAfter.playerStatus[currentIdx]).to.equal(2); // Folded
     });
   });
@@ -250,17 +248,12 @@ describe("agent_poker_game", () => {
       [checkGamePda] = deriveGamePda(checkGameId);
 
       const threePlayers = playerKeys.slice(0, 3);
-
-      await program.methods
-        .createGameTest(checkGameId, new BN(3), threePlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: checkGamePda,
-          ...getHandAccounts(checkGameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      await createGameAndJoin(
+        checkGameId,
+        checkGamePda,
+        new BN(3),
+        threePlayers
+      );
 
       const deck = generateShuffledDeck();
       await program.methods
@@ -268,14 +261,15 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: checkGamePda,
-          ...getHandAccounts(checkGameId),
         })
+        .remainingAccounts(getHandMetas(checkGameId, 3))
         .signers([authority])
         .rpc();
     });
 
     it("call matches the current bet", async () => {
-      const gameBefore = await program.account.gameState.fetch(checkGamePda);
+      const gameBefore =
+        await program.account.gameState.fetch(checkGamePda);
       const potBefore = gameBefore.pot.toNumber();
 
       await program.methods
@@ -287,12 +281,14 @@ describe("agent_poker_game", () => {
         .signers([authority])
         .rpc();
 
-      const gameAfter = await program.account.gameState.fetch(checkGamePda);
+      const gameAfter =
+        await program.account.gameState.fetch(checkGamePda);
       expect(gameAfter.pot.toNumber()).to.be.greaterThan(potBefore);
     });
 
     it("raise increases the current bet", async () => {
-      const gameBefore = await program.account.gameState.fetch(checkGamePda);
+      const gameBefore =
+        await program.account.gameState.fetch(checkGamePda);
       const currentBetBefore = gameBefore.currentBet.toNumber();
       const raiseAmount = currentBetBefore * 2;
 
@@ -305,7 +301,8 @@ describe("agent_poker_game", () => {
         .signers([authority])
         .rpc();
 
-      const gameAfter = await program.account.gameState.fetch(checkGamePda);
+      const gameAfter =
+        await program.account.gameState.fetch(checkGamePda);
       expect(gameAfter.currentBet.toNumber()).to.equal(raiseAmount);
     });
 
@@ -314,17 +311,12 @@ describe("agent_poker_game", () => {
       const [checkGamePda2] = deriveGamePda(checkGameId2);
 
       const twoPlayers = playerKeys.slice(0, 2);
-
-      await program.methods
-        .createGameTest(checkGameId2, new BN(4), twoPlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: checkGamePda2,
-          ...getHandAccounts(checkGameId2),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      await createGameAndJoin(
+        checkGameId2,
+        checkGamePda2,
+        new BN(4),
+        twoPlayers
+      );
 
       const deck = generateShuffledDeck();
       await program.methods
@@ -332,8 +324,8 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: checkGamePda2,
-          ...getHandAccounts(checkGameId2),
         })
+        .remainingAccounts(getHandMetas(checkGameId2, 2))
         .signers([authority])
         .rpc();
 
@@ -352,7 +344,8 @@ describe("agent_poker_game", () => {
           .signers([authority])
           .rpc();
 
-        const updated = await program.account.gameState.fetch(checkGamePda2);
+        const updated =
+          await program.account.gameState.fetch(checkGamePda2);
         expect(updated.currentPlayer).to.not.equal(currentPlayerIdx);
       } else {
         // If current player owes, call instead
@@ -365,8 +358,11 @@ describe("agent_poker_game", () => {
           .signers([authority])
           .rpc();
 
-        const updated = await program.account.gameState.fetch(checkGamePda2);
-        expect(updated.pot.toNumber()).to.be.greaterThan(game.pot.toNumber());
+        const updated =
+          await program.account.gameState.fetch(checkGamePda2);
+        expect(updated.pot.toNumber()).to.be.greaterThan(
+          game.pot.toNumber()
+        );
       }
     });
   });
@@ -377,17 +373,12 @@ describe("agent_poker_game", () => {
       const [phaseGamePda] = deriveGamePda(phaseGameId);
 
       const twoPlayers = playerKeys.slice(0, 2);
-
-      await program.methods
-        .createGameTest(phaseGameId, new BN(5), twoPlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: phaseGamePda,
-          ...getHandAccounts(phaseGameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      await createGameAndJoin(
+        phaseGameId,
+        phaseGamePda,
+        new BN(5),
+        twoPlayers
+      );
 
       const deck = generateShuffledDeck();
       await program.methods
@@ -395,8 +386,8 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: phaseGamePda,
-          ...getHandAccounts(phaseGameId),
         })
+        .remainingAccounts(getHandMetas(phaseGameId, 2))
         .signers([authority])
         .rpc();
 
@@ -469,19 +460,15 @@ describe("agent_poker_game", () => {
     it("picks a winner", async () => {
       const showdownGameId = new BN(Date.now() + 600);
       const [showdownGamePda] = deriveGamePda(showdownGameId);
+      const playerCount = 2;
 
-      const twoPlayers = playerKeys.slice(0, 2);
-
-      await program.methods
-        .createGameTest(showdownGameId, new BN(6), twoPlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: showdownGamePda,
-          ...getHandAccounts(showdownGameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
+      const twoPlayers = playerKeys.slice(0, playerCount);
+      await createGameAndJoin(
+        showdownGameId,
+        showdownGamePda,
+        new BN(6),
+        twoPlayers
+      );
 
       const deck = generateShuffledDeck();
       await program.methods
@@ -489,8 +476,8 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: showdownGamePda,
-          ...getHandAccounts(showdownGameId),
         })
+        .remainingAccounts(getHandMetas(showdownGameId, playerCount))
         .signers([authority])
         .rpc();
 
@@ -504,19 +491,19 @@ describe("agent_poker_game", () => {
         .signers([authority])
         .rpc();
 
-      let game = await program.account.gameState.fetch(showdownGamePda);
+      let game =
+        await program.account.gameState.fetch(showdownGamePda);
       expect(JSON.stringify(game.phase)).to.equal(
         JSON.stringify({ showdown: {} })
       );
 
-      // Use showdown_test (no permissions needed on devnet)
       await program.methods
         .showdownTest()
         .accountsPartial({
           authority: authority.publicKey,
           game: showdownGamePda,
-          ...getHandAccounts(showdownGameId),
         })
+        .remainingAccounts(getHandMetas(showdownGameId, playerCount))
         .signers([authority])
         .rpc();
 
@@ -524,7 +511,7 @@ describe("agent_poker_game", () => {
       expect(JSON.stringify(game.phase)).to.equal(
         JSON.stringify({ complete: {} })
       );
-      expect(game.winnerIndex).to.be.lessThan(2);
+      expect(game.winnerIndex).to.be.lessThan(playerCount);
     });
   });
 
@@ -532,21 +519,18 @@ describe("agent_poker_game", () => {
     it("runs a complete hand from creation to showdown", async () => {
       const lifecycleGameId = new BN(Date.now() + 700);
       const [lifecycleGamePda] = deriveGamePda(lifecycleGameId);
+      const playerCount = 2;
 
-      const twoPlayers = playerKeys.slice(0, 2);
+      const twoPlayers = playerKeys.slice(0, playerCount);
+      await createGameAndJoin(
+        lifecycleGameId,
+        lifecycleGamePda,
+        new BN(7),
+        twoPlayers
+      );
 
-      await program.methods
-        .createGameTest(lifecycleGameId, new BN(7), twoPlayers, WAGER)
-        .accountsPartial({
-          authority: authority.publicKey,
-          game: lifecycleGamePda,
-          ...getHandAccounts(lifecycleGameId),
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
-
-      let game = await program.account.gameState.fetch(lifecycleGamePda);
+      let game =
+        await program.account.gameState.fetch(lifecycleGamePda);
       expect(JSON.stringify(game.phase)).to.equal(
         JSON.stringify({ waiting: {} })
       );
@@ -557,8 +541,8 @@ describe("agent_poker_game", () => {
         .accountsPartial({
           authority: authority.publicKey,
           game: lifecycleGamePda,
-          ...getHandAccounts(lifecycleGameId),
         })
+        .remainingAccounts(getHandMetas(lifecycleGameId, playerCount))
         .signers([authority])
         .rpc();
 
@@ -569,7 +553,8 @@ describe("agent_poker_game", () => {
 
       const playRound = async () => {
         for (let i = 0; i < 4; i++) {
-          game = await program.account.gameState.fetch(lifecycleGamePda);
+          game =
+            await program.account.gameState.fetch(lifecycleGamePda);
           const phase = JSON.stringify(game.phase);
 
           if (
@@ -608,7 +593,8 @@ describe("agent_poker_game", () => {
       };
 
       for (let round = 0; round < 4; round++) {
-        game = await program.account.gameState.fetch(lifecycleGamePda);
+        game =
+          await program.account.gameState.fetch(lifecycleGamePda);
         const phase = JSON.stringify(game.phase);
         if (
           phase === JSON.stringify({ showdown: {} }) ||
@@ -631,8 +617,10 @@ describe("agent_poker_game", () => {
           .accountsPartial({
             authority: authority.publicKey,
             game: lifecycleGamePda,
-            ...getHandAccounts(lifecycleGameId),
           })
+          .remainingAccounts(
+            getHandMetas(lifecycleGameId, playerCount)
+          )
           .signers([authority])
           .rpc();
       }
@@ -641,7 +629,7 @@ describe("agent_poker_game", () => {
       expect(JSON.stringify(game.phase)).to.equal(
         JSON.stringify({ complete: {} })
       );
-      expect(game.winnerIndex).to.be.lessThan(2);
+      expect(game.winnerIndex).to.be.lessThan(playerCount);
     });
   });
 });

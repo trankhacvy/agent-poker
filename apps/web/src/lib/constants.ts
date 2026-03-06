@@ -1,6 +1,11 @@
 export const GAME_SERVER_URL = process.env.NEXT_PUBLIC_GAME_SERVER_URL ?? "http://localhost:3001";
 export const GAME_SERVER_WS_URL = process.env.NEXT_PUBLIC_GAME_SERVER_WS_URL ?? "ws://localhost:3001/ws";
 
+export const SOLANA_RPC_URL = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+export const SOLANA_WS_URL = process.env.NEXT_PUBLIC_SOLANA_WS_URL ?? "wss://api.devnet.solana.com";
+export const ER_RPC_URL = process.env.NEXT_PUBLIC_ER_RPC_URL ?? "https://devnet.magicblock.app/";
+export const ER_WS_URL = process.env.NEXT_PUBLIC_ER_WS_URL ?? "wss://devnet.magicblock.app/";
+
 export const AGENT_PROGRAM_ID = "6xJviS1Mz3rArD3JciQ55u7K1xDqtYr1AGvSeWvW1dti";
 export const ESCROW_PROGRAM_ID = "Ed684BPr262EGicZGayjLNB8ujMYct771bc8LMBV5CUf";
 export const BETTING_PROGRAM_ID = "HR2iEFkkt893fFtatyp3hivAzC8jznVpeoCAy5HBfQ4D";

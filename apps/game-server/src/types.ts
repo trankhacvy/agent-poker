@@ -15,6 +15,7 @@ export interface PlayerInfo {
 export interface GameAction {
   type: "fold" | "check" | "call" | "raise" | "all_in";
   amount?: number;
+  reasoning?: string;
 }
 
 export interface GameStateSnapshot {
@@ -65,37 +66,24 @@ export interface QueueTimeoutData {
 
 export interface WsMessage {
   type:
-    | "game_state"
-    | "game_action"
-    | "game_start"
-    | "game_end"
+    | "arena_round_start"
+    | "arena_betting_countdown"
+    | "arena_betting_locked"
+    | "arena_gate_failed"
+    | "arena_agent_action"
+    | "arena_game_end"
+    | "arena_cooldown"
+    | "arena_error"
+    | "arena_game_failed"
     | "table_update"
     | "betting_countdown"
     | "betting_locked"
     | "queue_timeout"
     | "pool_update"
     | "next_game_countdown"
-    | "arena_state_change"
-    | "arena_betting_open"
-    | "arena_betting_countdown"
-    | "arena_betting_locked"
-    | "arena_gate_failed"
-    | "arena_game_complete"
-    | "arena_game_failed"
-    | "arena_cooldown"
-    | "arena_pool_update"
-    | "arena_error"
     | "error";
-  data:
-    | GameStateSnapshot
-    | GameAction
-    | TableInfo
-    | BettingWindowData
-    | QueueTimeoutData
-    | { totalPool: number; agentPools: Record<string, number> }
-    | { secondsRemaining: number }
-    | { message: string }
-    | Record<string, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data: any;
   gameId?: string;
   tableId?: string;
   timestamp: number;

@@ -11,14 +11,12 @@ import { evaluateHand } from "../lib/hand-evaluator.js";
 export type LlmProvider = "gemini" | "openrouter";
 
 const GameActionSchema = z.object({
-  type: z
-    .enum(["fold", "check", "call", "raise", "all_in"])
-    .describe("The poker action to take"),
+  type: z.enum(["fold", "check", "call", "raise", "all_in"]).describe("The poker action to take"),
   amount: z
     .number()
-    .optional()
+    .nullable()
     .describe(
-      "Total bet size in BB (big blinds). Required only for raise actions. Example: 3 means raise to 3BB total."
+      "Total bet size in BB (big blinds). Required only for raise actions. Example: 3 means raise to 3BB total. Set to null for non-raise actions."
     ),
 });
 
@@ -44,15 +42,12 @@ export class LlmGateway {
 
     if (this.provider === "openrouter") {
       if (!opts.openrouterApiKey)
-        throw new Error(
-          "openrouterApiKey required for openrouter provider"
-        );
+        throw new Error("openrouterApiKey required for openrouter provider");
       this.openrouter = createOpenRouter({
         apiKey: opts.openrouterApiKey,
       });
     } else {
-      if (!opts.googleApiKey)
-        throw new Error("googleApiKey required for gemini provider");
+      if (!opts.googleApiKey) throw new Error("googleApiKey required for gemini provider");
       this.google = createGoogleGenerativeAI({
         apiKey: opts.googleApiKey,
       });
@@ -61,7 +56,14 @@ export class LlmGateway {
 
   private getModel(): LanguageModel {
     if (this.provider === "openrouter") {
-      return this.openrouter!.chat("meta-llama/llama-3.3-70b-instruct");
+      // return this.openrouter!.chat("meta-llama/llama-3.3-70b-instruct");
+      return this.openrouter!.chat("openai/gpt-5-nano", {
+        // reasoning: {
+        //   enabled: true,
+        //   exclude: false,
+        //   effort: "medium",
+        // },
+      });
     }
     return this.google!("gemini-2.5-flash");
   }
@@ -70,9 +72,7 @@ export class LlmGateway {
     if (this.minDelayMs <= 0) return;
     const elapsed = Date.now() - this.lastCallTime;
     if (elapsed < this.minDelayMs) {
-      await new Promise((r) =>
-        setTimeout(r, this.minDelayMs - elapsed)
-      );
+      await new Promise((r) => setTimeout(r, this.minDelayMs - elapsed));
     }
     this.lastCallTime = Date.now();
   }
@@ -89,10 +89,7 @@ export class LlmGateway {
     }
 
     const userMessage = this.buildUserMessage(gameState, playerIndex);
-    this.log.info(
-      { seat: playerIndex, template: tmpl.name },
-      "Requesting LLM action"
-    );
+    this.log.info({ seat: playerIndex, template: tmpl.name }, "Requesting LLM action");
     this.log.debug({ prompt: userMessage }, "LLM prompt");
 
     for (let attempt = 0; attempt < 3; attempt++) {
@@ -109,8 +106,24 @@ export class LlmGateway {
           abortSignal: AbortSignal.timeout(30000),
         });
 
+        console.log("llm result", result.content);
+        console.log("llm result reasoning", result.reasoning, result.reasoningText);
+
         if (result.output) {
-          const action = { ...result.output };
+          const action: GameAction = {
+            type: result.output.type,
+            amount: result.output.amount ?? undefined,
+          };
+
+          // Capture LLM reasoning text
+          const reasoning =
+            (result as unknown as { reasoningText?: string }).reasoningText ||
+            result.text ||
+            undefined;
+          if (reasoning) {
+            action.reasoning = reasoning.length > 500 ? reasoning.slice(0, 500) + "…" : reasoning;
+          }
+
           if (action.type === "raise" && action.amount != null) {
             const bb = gameState.bigBlind ?? 1;
             const lamports = Math.round(action.amount * bb);
@@ -144,19 +157,12 @@ export class LlmGateway {
           "LLM returned null output, retrying"
         );
       } catch (err) {
-        this.log.error(
-          { err, seat: playerIndex, attempt: attempt + 1 },
-          "LLM attempt error"
-        );
+        this.log.error({ err, seat: playerIndex, attempt: attempt + 1 }, "LLM attempt error");
       }
     }
 
-    const costToCall = Math.max(
-      0,
-      gameState.currentBet - (player.currentBet ?? 0)
-    );
-    const fallback: GameAction =
-      costToCall === 0 ? { type: "check" } : { type: "call" };
+    const costToCall = Math.max(0, gameState.currentBet - (player.currentBet ?? 0));
+    const fallback: GameAction = costToCall === 0 ? { type: "check" } : { type: "call" };
     this.log.info(
       { seat: playerIndex, fallback: fallback.type },
       "All LLM attempts failed, using fallback"
@@ -165,9 +171,7 @@ export class LlmGateway {
   }
 
   private cardName(index: number): string {
-    const RANKS = [
-      "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A",
-    ];
+    const RANKS = ["2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K", "A"];
     const SUITS = ["h", "d", "c", "s"];
     return `${RANKS[index % 13]}${SUITS[Math.floor(index / 13)]}`;
   }
@@ -183,30 +187,20 @@ export class LlmGateway {
     return `${bbs.toFixed(1)}BB`;
   }
 
-  private buildUserMessage(
-    gameState: GameStateSnapshot,
-    playerIndex: number
-  ): string {
+  private buildUserMessage(gameState: GameStateSnapshot, playerIndex: number): string {
     const player = gameState.players[playerIndex];
     if (!player) {
       return "No player data available. Respond with fold.";
     }
 
     const bb = gameState.bigBlind ?? gameState.currentBet ?? 1;
-    const costToCall = Math.max(
-      0,
-      gameState.currentBet - player.currentBet
-    );
+    const costToCall = Math.max(0, gameState.currentBet - player.currentBet);
     const potAfterCall = gameState.pot + costToCall;
     const potOdds =
-      costToCall > 0
-        ? `${(potAfterCall / costToCall).toFixed(1)}:1`
-        : "free (you can check)";
+      costToCall > 0 ? `${(potAfterCall / costToCall).toFixed(1)}:1` : "free (you can check)";
 
     const startingStack = bb * 100;
-    const playerCount = gameState.players.filter(
-      (p) => p.status !== "empty"
-    ).length;
+    const playerCount = gameState.players.filter((p) => p.status !== "empty").length;
     const isHeadsUp = playerCount === 2;
 
     let handStrengthLine = "";
@@ -225,9 +219,7 @@ export class LlmGateway {
     if (isHeadsUp) {
       lines.push(`This is HEADS-UP (1v1). Play wide ranges.`);
     } else {
-      lines.push(
-        `This is a ${playerCount}-player game. Tighten your ranges.`
-      );
+      lines.push(`This is a ${playerCount}-player game. Tighten your ranges.`);
     }
 
     lines.push(
@@ -270,12 +262,7 @@ export class LlmGateway {
 
     const actions: string[] = [];
     if (costToCall === 0) {
-      actions.push(
-        "check",
-        `raise (min ${this.toBB(bb * 2, bb)})`,
-        "all_in",
-        "fold"
-      );
+      actions.push("check", `raise (min ${this.toBB(bb * 2, bb)})`, "all_in", "fold");
     } else {
       actions.push(
         `call (${this.toBB(costToCall, bb)})`,

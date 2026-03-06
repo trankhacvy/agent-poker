@@ -70,20 +70,24 @@ export default function PlayingCard({
 
   const cardFront = (
     <div
-      className={`${sizes[size]} flex-shrink-0 rounded-lg bg-white shadow-lg flex flex-col items-center justify-center relative border border-gray-200`}
+      className={`${sizes[size]} flex-shrink-0 rounded bg-white shadow-lg flex flex-col items-center justify-center relative border`}
       style={{ backfaceVisibility: animateFlip ? "hidden" : undefined }}
     >
       {/* Center rank + suit */}
       <span className={`font-bold ${color} ${rankSizes[size]} leading-none`}>{rank}</span>
       <span className={`${color} text-[10px] leading-none mt-0.5`}>{symbol}</span>
       {/* Top-left corner */}
-      <span className={`absolute top-1 left-1.5 ${color} ${cornerSizes[size]} leading-none font-semibold`}>
+      <span
+        className={`absolute top-1 left-1.5 ${color} ${cornerSizes[size]} leading-none font-semibold`}
+      >
         {rank}
         <br />
         {symbol}
       </span>
       {/* Bottom-right corner */}
-      <span className={`absolute bottom-1 right-1.5 rotate-180 ${color} ${cornerSizes[size]} leading-none font-semibold`}>
+      <span
+        className={`absolute bottom-1 right-1.5 rotate-180 ${color} ${cornerSizes[size]} leading-none font-semibold`}
+      >
         {rank}
         <br />
         {symbol}
@@ -93,7 +97,7 @@ export default function PlayingCard({
 
   const cardBack = (
     <div
-      className={`${sizes[size]} flex-shrink-0 rounded-lg shadow-lg relative overflow-hidden`}
+      className={`${sizes[size]} flex-shrink-0 rounded shadow-lg relative overflow-hidden`}
       style={{
         backgroundImage: "url(/card-back.png)",
         backgroundSize: "cover",

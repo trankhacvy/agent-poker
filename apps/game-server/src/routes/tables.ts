@@ -7,9 +7,7 @@ const TableIdParamsSchema = Type.Object({
   tableId: Type.String(),
 });
 
-export default async function tableRoutes(
-  fastify: FastifyInstance
-): Promise<void> {
+export default async function tableRoutes(fastify: FastifyInstance): Promise<void> {
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
   app.get(
@@ -40,13 +38,9 @@ export default async function tableRoutes(
       },
     },
     async (request, reply) => {
-      const table = fastify.matchmaker.getTable(
-        request.params.tableId
-      );
+      const table = fastify.matchmaker.getTable(request.params.tableId);
       if (!table) {
-        return reply
-          .status(404)
-          .send({ statusCode: 404, message: "Table not found" });
+        return reply.status(404).send({ statusCode: 404, message: "Table not found" });
       }
       return table;
     }
@@ -70,12 +64,7 @@ export default async function tableRoutes(
     },
     async (request, reply) => {
       const { wallet, agentPubkey, amount } = request.body;
-      const ok = fastify.matchmaker.placeBet(
-        request.params.tableId,
-        wallet,
-        agentPubkey,
-        amount
-      );
+      const ok = fastify.matchmaker.placeBet(request.params.tableId, wallet, agentPubkey, amount);
       if (!ok) {
         return reply.status(400).send({
           statusCode: 400,

@@ -6,7 +6,6 @@ import type { WsFeed } from "./websocket-feed.js";
 import type {
   GameConfig,
   GameStateSnapshot,
-  PlayerSnapshot,
   GameAction,
   WsMessage,
 } from "../types.js";
@@ -23,7 +22,6 @@ export class Orchestrator {
   private solanaClient: SolanaClient;
   private llmGateway: LlmGateway;
   private wsFeed: WsFeed;
-  private activeGames: Map<string, GameStateSnapshot> = new Map();
   private log: FastifyBaseLogger;
 
   constructor(
@@ -47,32 +45,12 @@ export class Orchestrator {
       "Starting game"
     );
 
-    const initialPlayers: PlayerSnapshot[] = players.map((p) => ({
-      pubkey: p.pubkey,
-      displayName: p.displayName,
-      template: p.template,
-      seatIndex: p.seatIndex,
-      status: "active",
-      currentBet: 0,
-    }));
-
-    const state: GameStateSnapshot = {
-      gameId,
-      tableId,
-      phase: "waiting",
-      pot: 0,
-      currentBet: 0,
-      currentPlayer: 0,
-      communityCards: [],
-      players: initialPlayers,
-    };
-    this.activeGames.set(gameId, state);
-    this.broadcastState(state, "game_start");
-
+    // Create game on L1
     this.log.info({ gameId }, "Creating game on-chain (L1)");
     await this.solanaClient.createGame(gameId, tableId, wagerTier);
     this.log.info({ gameId }, "Game created on L1");
 
+    // Join all players
     for (const player of players) {
       this.log.info(
         { gameId, seat: player.seatIndex, name: player.displayName },
@@ -89,13 +67,7 @@ export class Orchestrator {
       );
     }
 
-    this.log.info({ gameId }, "Delegating empty hand PDAs");
-    await this.solanaClient.delegateEmptyHands(
-      gameId,
-      players.length
-    );
-    this.log.info({ gameId }, "Empty hands delegated");
-
+    // Delegate to ER
     this.log.info({ gameId }, "Starting game (delegating to ER)");
     await this.solanaClient.startGame(gameId);
     this.log.info({ gameId }, "GameState delegated to ER");
@@ -105,8 +77,9 @@ export class Orchestrator {
     await this.solanaClient.waitForErAccount(gamePda);
     this.log.info({ gameId }, "Game account available on ER");
 
+    // VRF shuffle
     this.log.info({ gameId }, "Requesting VRF shuffle");
-    await this.solanaClient.requestShuffle(gameId);
+    await this.solanaClient.requestShuffle(gameId, players.length);
     this.log.info({ gameId }, "VRF shuffle requested");
 
     this.log.info({ gameId }, "Waiting for VRF callback");
@@ -116,57 +89,40 @@ export class Orchestrator {
       "VRF callback completed"
     );
 
+    // Build a local snapshot for LLM context (cards, names)
+    const localState = this.buildLlmContext(config, erState);
+
+    // Fetch hole cards for LLM context
     for (let i = 0; i < players.length; i++) {
       let hand: { hand: number[] } | null = null;
       for (let attempt = 0; attempt < 3; attempt++) {
-        hand = await this.solanaClient.getPlayerHand(
-          gameId,
-          i,
-          true
-        );
+        hand = await this.solanaClient.getPlayerHand(gameId, i, true);
         if (hand && hand.hand[0] !== 255) break;
         this.log.info(
-          {
-            gameId,
-            seat: i,
-            attempt: attempt + 1,
-            hand: hand?.hand,
-          },
+          { gameId, seat: i, attempt: attempt + 1, hand: hand?.hand },
           "Hole card fetch retry"
         );
         await new Promise((r) => setTimeout(r, 2000));
       }
       if (hand && hand.hand[0] !== 255) {
-        const playerSnapshot = state.players[i];
+        const playerSnapshot = localState.players[i];
         if (playerSnapshot) {
           playerSnapshot.holeCards = [hand.hand[0]!, hand.hand[1]!];
           this.log.info(
-            {
-              gameId,
-              seat: i,
-              cards: [hand.hand[0], hand.hand[1]],
-            },
+            { gameId, seat: i, cards: [hand.hand[0], hand.hand[1]] },
             "Hole cards fetched"
           );
         }
       } else {
-        this.log.warn(
-          { gameId, seat: i },
-          "Could not fetch hole cards"
-        );
+        this.log.warn({ gameId, seat: i }, "Could not fetch hole cards");
       }
     }
 
-    state.bigBlind =
+    localState.bigBlind =
       erState.currentBet > 0 ? erState.currentBet : 1;
-    this.log.info(
-      { gameId, bigBlind: state.bigBlind, pot: erState.pot },
-      "Blinds set"
-    );
+    this.syncLlmContext(localState, erState);
 
-    this.syncLocalState(state, erState);
-    this.broadcastState(state, "game_state");
-
+    // Game loop: LLM decisions → playerAction txs
     let loopGuard = 0;
     const MAX_LOOP_ITERATIONS = 200;
 
@@ -183,7 +139,7 @@ export class Orchestrator {
       if (activePlayers.length <= 1) break;
 
       const currentIdx = erState.currentPlayer;
-      const player = state.players[currentIdx];
+      const player = localState.players[currentIdx];
       if (!player || player.status !== "active") {
         erState =
           (await this.solanaClient.getGameState(gameId, true)) ??
@@ -202,11 +158,11 @@ export class Orchestrator {
       );
       const action = await this.llmGateway.getAction(
         player.template,
-        state,
+        localState,
         currentIdx
       );
 
-      const actionCode = ACTION_MAP[action.type] ?? 1; // default to check if unknown
+      const actionCode = ACTION_MAP[action.type] ?? 1;
       const raiseAmount = action.amount ?? 0;
 
       this.log.info(
@@ -227,9 +183,8 @@ export class Orchestrator {
         raiseAmount
       );
 
-      this.applyAction(state, currentIdx, action);
-      state.lastAction = { playerIndex: currentIdx, action };
-      this.broadcastState(state, "game_action");
+      // Broadcast LLM reasoning (frontend gets game state from chain subscription)
+      this.broadcastAgentAction(gameId, tableId, currentIdx, player.displayName, action);
 
       const newErState = await this.solanaClient.getGameState(
         gameId,
@@ -237,19 +192,18 @@ export class Orchestrator {
       );
       if (newErState) {
         erState = newErState;
-        this.syncLocalState(state, erState);
+        this.syncLlmContext(localState, erState);
       }
     }
 
-    if (
-      erState.phase === "showdown" ||
-      this.countActivePlayers(state) <= 1
-    ) {
-      this.log.info({ gameId }, "Running showdown on ER");
-      state.phase = "showdown";
-      this.broadcastState(state, "game_state");
+    // Showdown
+    const activeCount = erState.players.filter(
+      (p) => p.status === "active" || p.status === "all_in"
+    ).length;
 
-      await this.solanaClient.showdownTest(gameId);
+    if (erState.phase === "showdown" || activeCount <= 1) {
+      this.log.info({ gameId }, "Running showdown on ER");
+      await this.solanaClient.showdownTest(gameId, players.length);
 
       const showdownState = await this.solanaClient.getGameState(
         gameId,
@@ -257,7 +211,6 @@ export class Orchestrator {
       );
       if (showdownState) {
         erState = showdownState;
-        this.syncLocalState(state, erState);
       }
     }
 
@@ -266,11 +219,12 @@ export class Orchestrator {
       {
         gameId,
         winnerSeat: winnerIndex,
-        winnerName: state.players[winnerIndex]?.displayName,
+        winnerName: players[winnerIndex]?.displayName,
       },
       "Winner determined"
     );
 
+    // Commit back to L1
     this.log.info({ gameId }, "Committing game back to L1");
     await this.solanaClient.commitGame(gameId);
 
@@ -278,19 +232,33 @@ export class Orchestrator {
     await this.solanaClient.waitForBaseLayerSettle(gameId);
     this.log.info({ gameId }, "Game settled on L1");
 
-    state.phase = "settled";
-    state.winnerIndex = winnerIndex;
-    this.broadcastState(state, "game_end");
-    this.activeGames.delete(gameId);
-
-    return { winnerIndex, pot: state.pot };
+    return { winnerIndex, pot: erState.pot };
   }
 
-  getGameState(gameId: string): GameStateSnapshot | undefined {
-    return this.activeGames.get(gameId);
+  private buildLlmContext(
+    config: GameConfig,
+    erState: GameStateSnapshot
+  ): GameStateSnapshot {
+    return {
+      gameId: config.gameId,
+      tableId: config.tableId,
+      phase: erState.phase,
+      pot: erState.pot,
+      currentBet: erState.currentBet,
+      currentPlayer: erState.currentPlayer,
+      communityCards: erState.communityCards,
+      players: config.players.map((p) => ({
+        pubkey: p.pubkey,
+        displayName: p.displayName,
+        template: p.template,
+        seatIndex: p.seatIndex,
+        status: "active" as const,
+        currentBet: 0,
+      })),
+    };
   }
 
-  private syncLocalState(
+  private syncLlmContext(
     local: GameStateSnapshot,
     er: GameStateSnapshot
   ): void {
@@ -310,65 +278,26 @@ export class Orchestrator {
     }
   }
 
-  private countActivePlayers(state: GameStateSnapshot): number {
-    return state.players.filter(
-      (p) => p.status === "active" || p.status === "all_in"
-    ).length;
-  }
-
-  private applyAction(
-    state: GameStateSnapshot,
-    playerIdx: number,
+  private broadcastAgentAction(
+    gameId: string,
+    tableId: string,
+    seatIndex: number,
+    playerName: string,
     action: GameAction
   ): void {
-    const player = state.players[playerIdx]!;
-
-    switch (action.type) {
-      case "fold":
-        player.status = "folded";
-        break;
-      case "check":
-        break;
-      case "call": {
-        const callAmount = state.currentBet - player.currentBet;
-        player.currentBet = state.currentBet;
-        state.pot += callAmount;
-        action.amount = callAmount;
-        break;
-      }
-      case "raise": {
-        const raiseTotal =
-          action.amount ?? state.currentBet * 2;
-        const added = raiseTotal - player.currentBet;
-        player.currentBet = raiseTotal;
-        state.currentBet = raiseTotal;
-        state.pot += added;
-        break;
-      }
-      case "all_in": {
-        player.status = "all_in";
-        const allInAmount =
-          state.currentBet - player.currentBet;
-        player.currentBet = state.currentBet;
-        state.pot += allInAmount;
-        break;
-      }
-    }
-  }
-
-  private broadcastState(
-    state: GameStateSnapshot,
-    type: WsMessage["type"]
-  ): void {
     const message: WsMessage = {
-      type,
-      data: state,
-      gameId: state.gameId,
-      tableId: state.tableId,
+      type: "arena_agent_action",
+      data: {
+        seatIndex,
+        playerName,
+        action: action.type,
+        amount: action.amount ?? 0,
+        reasoning: action.reasoning,
+      },
+      gameId,
+      tableId,
       timestamp: Date.now(),
     };
-    this.wsFeed.broadcastToGame(state.gameId, message);
-    // Also broadcast to the arena channel so arena spectators see game updates
     this.wsFeed.broadcastToChannel("arena", message);
   }
 }

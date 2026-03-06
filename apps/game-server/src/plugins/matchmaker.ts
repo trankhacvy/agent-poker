@@ -2,12 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyInstance } from "fastify";
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
-import type {
-  PlayerInfo,
-  TableInfo,
-  BettingWindowData,
-  QueueTimeoutData,
-} from "../types.js";
+import type { PlayerInfo, TableInfo, BettingWindowData, QueueTimeoutData } from "../types.js";
 import type { WsFeed } from "./websocket-feed.js";
 
 const AGENTS_PER_GAME = 6;
@@ -46,19 +41,15 @@ interface MatchmakerEvents {
       players: PlayerInfo[];
     },
   ];
-  queueTimeout: [
-    config: { wagerTier: number; refundedPlayers: PlayerInfo[] },
-  ];
+  queueTimeout: [config: { wagerTier: number; refundedPlayers: PlayerInfo[] }];
 }
 
 export class Matchmaker extends EventEmitter<MatchmakerEvents> {
   private queues: Map<number, QueueEntry> = new Map();
   private tables: Map<string, TableInfo> = new Map();
   private bettingWindows: Map<string, BettingWindow> = new Map();
-  private betPools: Map<
-    string,
-    Map<string, { total: number; bettors: Map<string, number> }>
-  > = new Map();
+  private betPools: Map<string, Map<string, { total: number; bettors: Map<string, number> }>> =
+    new Map();
   private wsFeed: WsFeed;
   private queueCleanupTimer: ReturnType<typeof setInterval>;
 
@@ -81,12 +72,10 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     entry.players.push(playerInfo);
 
     if (entry.players.length >= AGENTS_PER_GAME) {
-      const players = entry.players
-        .splice(0, AGENTS_PER_GAME)
-        .map((p, i) => ({
-          ...p,
-          seatIndex: i,
-        }));
+      const players = entry.players.splice(0, AGENTS_PER_GAME).map((p, i) => ({
+        ...p,
+        seatIndex: i,
+      }));
       const tableId = randomUUID();
 
       if (entry.players.length === 0) {
@@ -108,15 +97,9 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     }
   }
 
-  placeBet(
-    tableId: string,
-    wallet: string,
-    agentPubkey: string,
-    amount: number
-  ): boolean {
+  placeBet(tableId: string, wallet: string, agentPubkey: string, amount: number): boolean {
     if (amount <= 0) return false;
     if (!this.isBettingWindowActive(tableId)) return false;
-
     let tablePool = this.betPools.get(tableId);
     if (!tablePool) {
       tablePool = new Map();
@@ -144,9 +127,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     return true;
   }
 
-  getPool(
-    tableId: string
-  ): { totalPool: number; agentPools: Record<string, number> } {
+  getPool(tableId: string): { totalPool: number; agentPools: Record<string, number> } {
     const tablePool = this.betPools.get(tableId);
     if (!tablePool) return { totalPool: 0, agentPools: {} };
 
@@ -165,10 +146,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
       return 0;
     }
     const elapsed = (Date.now() - window.startedAt) / 1000;
-    return Math.max(
-      0,
-      Math.ceil(BETTING_WINDOW_SECONDS - elapsed)
-    );
+    return Math.max(0, Math.ceil(BETTING_WINDOW_SECONDS - elapsed));
   }
 
   isBettingWindowActive(tableId: string): boolean {
@@ -188,10 +166,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     return this.tables.get(tableId);
   }
 
-  updateTableStatus(
-    tableId: string,
-    status: TableInfo["status"]
-  ): void {
+  updateTableStatus(tableId: string, status: TableInfo["status"]): void {
     const table = this.tables.get(tableId);
     if (table) {
       table.status = status;
@@ -207,11 +182,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     this.bettingWindows.clear();
   }
 
-  private startBettingWindow(
-    tableId: string,
-    wagerTier: number,
-    players: PlayerInfo[]
-  ): void {
+  private startBettingWindow(tableId: string, wagerTier: number, players: PlayerInfo[]): void {
     const startedAt = Date.now();
 
     const countdownTimer = setInterval(() => {
@@ -297,10 +268,7 @@ export class Matchmaker extends EventEmitter<MatchmakerEvents> {
     const now = Date.now();
 
     for (const [wagerTier, entry] of this.queues) {
-      if (
-        now - entry.createdAt >= QUEUE_TIMEOUT_MS &&
-        entry.players.length > 0
-      ) {
+      if (now - entry.createdAt >= QUEUE_TIMEOUT_MS && entry.players.length > 0) {
         const refundedPlayers = [...entry.players];
         this.queues.delete(wagerTier);
 

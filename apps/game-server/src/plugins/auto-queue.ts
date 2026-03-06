@@ -77,10 +77,7 @@ export class AutoQueue {
       return;
     }
 
-    this.log.info(
-      { intervalMs: this.intervalMs },
-      "AutoQueue started"
-    );
+    this.log.info({ intervalMs: this.intervalMs }, "AutoQueue started");
 
     this.tick();
     this.timer = setInterval(() => this.tick(), this.intervalMs);
@@ -98,14 +95,10 @@ export class AutoQueue {
   private async tick(): Promise<void> {
     try {
       const tables = this.matchmaker.getActiveTables();
-      const hasActiveGame = tables.some(
-        (t) => t.status === "in_progress" || t.status === "full"
-      );
+      const hasActiveGame = tables.some((t) => t.status === "in_progress" || t.status === "full");
 
       if (hasActiveGame) {
-        this.log.debug(
-          "AutoQueue skipping — active game already running"
-        );
+        this.log.debug("AutoQueue skipping — active game already running");
         return;
       }
 
@@ -133,9 +126,7 @@ export class AutoQueue {
         return;
       }
 
-      const shuffled = [...agents].sort(
-        () => Math.random() - 0.5
-      );
+      const shuffled = [...agents].sort(() => Math.random() - 0.5);
       const picked = shuffled.slice(0, AGENTS_PER_GAME);
 
       this.log.info(
@@ -157,10 +148,7 @@ export class AutoQueue {
         );
       }
     } catch (err) {
-      this.log.error(
-        { err },
-        "AutoQueue tick failed, will retry next interval"
-      );
+      this.log.error({ err }, "AutoQueue tick failed, will retry next interval");
     }
   }
 }
@@ -173,16 +161,12 @@ declare module "fastify" {
 
 export default fp(
   async (fastify: FastifyInstance) => {
-    const autoQueue = new AutoQueue(
-      fastify.matchmaker,
-      fastify.solanaRead,
-      {
-        intervalMs: fastify.env.AUTO_MATCH_INTERVAL_MS,
-        enabled: fastify.env.AUTO_MATCH_ENABLED,
-        wsFeed: fastify.wsFeed,
-        log: fastify.log,
-      }
-    );
+    const autoQueue = new AutoQueue(fastify.matchmaker, fastify.solanaRead, {
+      intervalMs: fastify.env.AUTO_MATCH_INTERVAL_MS,
+      enabled: fastify.env.AUTO_MATCH_ENABLED,
+      wsFeed: fastify.wsFeed,
+      log: fastify.log,
+    });
     fastify.decorate("autoQueue", autoQueue);
     autoQueue.start();
     fastify.addHook("onClose", () => autoQueue.stop());
@@ -190,11 +174,6 @@ export default fp(
   },
   {
     name: "auto-queue",
-    dependencies: [
-      "env",
-      "matchmaker",
-      "solana-read",
-      "websocket-feed",
-    ],
+    dependencies: ["env", "matchmaker", "solana-read", "websocket-feed"],
   }
 );

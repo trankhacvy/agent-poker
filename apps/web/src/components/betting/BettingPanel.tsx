@@ -9,6 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 
+type PlaceBetFn = (params: {
+  wallet: string;
+  agentPubkey: string;
+  amount: number;
+}) => Promise<{ success: boolean }>;
+
 const BETTING_WINDOW_TOTAL = 60;
 
 interface BettingPanelProps {
@@ -20,6 +26,7 @@ interface BettingPanelProps {
   winnerPublicKey?: string;
   bettingCountdown: number | null;
   bettingLocked: boolean;
+  onPlaceBet?: PlaceBetFn;
 }
 
 export default function BettingPanel({
@@ -31,6 +38,7 @@ export default function BettingPanel({
   winnerPublicKey,
   bettingCountdown,
   bettingLocked,
+  onPlaceBet,
 }: BettingPanelProps) {
   const { connected, publicKey } = useWallet();
   const [selectedAgent, setSelectedAgent] = useState("");
@@ -68,12 +76,13 @@ export default function BettingPanel({
     setLoading(true);
     setError(null);
     try {
-      await placeBet({
-        tableId,
-        wallet: publicKey.toBase58(),
-        agentPubkey: selectedAgent,
-        amount: parseFloat(betAmount),
-      });
+      const wallet = publicKey.toBase58();
+      const amount = parseFloat(betAmount);
+      if (onPlaceBet) {
+        await onPlaceBet({ wallet, agentPubkey: selectedAgent, amount });
+      } else {
+        await placeBet({ tableId, wallet, agentPubkey: selectedAgent, amount });
+      }
       const agent = activePlayers.find((p) => p.publicKey === selectedAgent);
       setUserBet({
         agentPublicKey: selectedAgent,

@@ -1,6 +1,6 @@
-import type { TableInfo, AgentData, GameStateSnapshot } from "./types";
-import { GAME_SERVER_URL, WAGER_TIERS } from "./constants";
-import { adaptTable, adaptAgent, adaptLeaderboardEntry, adaptGameState } from "./adapters";
+import type { TableInfo, AgentData } from "./types";
+import { GAME_SERVER_URL } from "./constants";
+import { adaptTable, adaptAgent, adaptLeaderboardEntry } from "./adapters";
 
 export async function fetchTables(): Promise<TableInfo[]> {
   const res = await fetch(`${GAME_SERVER_URL}/api/tables`);
@@ -54,13 +54,6 @@ export async function fetchLeaderboard(): Promise<AgentData[]> {
   return (json.leaderboard ?? []).map((e) =>
     adaptLeaderboardEntry(e as Parameters<typeof adaptLeaderboardEntry>[0])
   );
-}
-
-export async function fetchGameState(gameId: string): Promise<GameStateSnapshot | null> {
-  const res = await fetch(`${GAME_SERVER_URL}/api/games/${gameId}`);
-  if (!res.ok) return null;
-  const json = await res.json();
-  return adaptGameState(json as Parameters<typeof adaptGameState>[0]);
 }
 
 export interface GameHistoryRecord {
@@ -140,3 +133,4 @@ export async function placeBet(params: {
   }
   return res.json() as Promise<{ success: boolean }>;
 }
+

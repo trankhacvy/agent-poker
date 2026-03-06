@@ -66,10 +66,8 @@ export default function Navbar() {
                   className={cn(
                     "block relative font-semibold text-2xl transition-colors",
                     "px-6 py-6 md:py-8",
-                    "lg:-mr-0.25 lg:text-xs lg:font-semibold lg:leading-5 lg:uppercase lg:tracking-wider xl:px-12",
-                    isActive
-                      ? "text-neutral-50"
-                      : "text-neutral-300 hover:text-neutral-50"
+                    "lg:-mr-0.25 lg:text-xs lg:font-semibold lg:leading-5 lg:uppercase lg:tracking-wider",
+                    isActive ? "text-neutral-50" : "text-neutral-300 hover:text-neutral-50"
                   )}
                 >
                   {link.label}

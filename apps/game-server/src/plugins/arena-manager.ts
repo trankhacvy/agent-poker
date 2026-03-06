@@ -2,6 +2,7 @@ import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import { randomUUID } from "node:crypto";
 import { ARENA_AGENTS, type ArenaAgentConfig } from "../lib/arena-agents.js";
+import { loadState, saveState } from "../lib/arena-persistence.js";
 import type { Orchestrator } from "./orchestrator.js";
 import type { SolanaClient } from "./solana-write.js";
 import type { WsFeed } from "./websocket-feed.js";
@@ -11,7 +12,6 @@ import type { GameConfig, PlayerInfo, WsMessage } from "../types.js";
 // ─── Constants ───────────────────────────────────────────────
 const BETTING_WINDOW_SECONDS = 60;
 const COOLDOWN_SECONDS = 30;
-const MIN_BETTED_AGENTS = 2;
 const ARENA_WAGER_TIER = 0.1e9; // 0.1 SOL for blind calculation
 
 // ─── Types ───────────────────────────────────────────────────
@@ -27,14 +27,13 @@ export interface ArenaStatus {
   roundNumber: number;
   currentTableId: string | null;
   currentGameId: string | null;
-  agents: (ArenaAgentConfig & { virtualBalance: number })[];
+  agents: ArenaAgentConfig[];
   bettingSecondsRemaining: number | null;
   cooldownSecondsRemaining: number | null;
   requireBets: boolean;
 }
 
 export interface ArenaManagerConfig {
-  /** When false, the game plays even with zero bets — gate check is skipped. */
   requireBets: boolean;
 }
 
@@ -49,16 +48,6 @@ export class ArenaManager {
   private cooldownSecondsRemaining: number | null = null;
   private poolCreatedOnChain = false;
 
-  // Off-chain bet tracking — mirrors on-chain state for real-time WS updates.
-  // The actual SOL lives on-chain in the BettingPool vault.
-  private currentPool: {
-    agents: Map<string, { total: number; bettors: Map<string, number> }>;
-    totalPool: number;
-  } | null = null;
-
-  // Virtual balances for display
-  private virtualBalances: Map<string, number> = new Map();
-
   constructor(
     private orchestrator: Orchestrator,
     private solanaClient: SolanaClient,
@@ -66,11 +55,7 @@ export class ArenaManager {
     private gameTracker: GameTracker,
     private log: FastifyBaseLogger,
     private config: ArenaManagerConfig
-  ) {
-    for (const agent of ARENA_AGENTS) {
-      this.virtualBalances.set(agent.pubkey, 100);
-    }
-  }
+  ) {}
 
   // ── Public API ──────────────────────────────────────────
   getStatus(): ArenaStatus {
@@ -79,81 +64,32 @@ export class ArenaManager {
       roundNumber: this.roundNumber,
       currentTableId: this.currentTableId,
       currentGameId: this.currentGameId,
-      agents: ARENA_AGENTS.map((a) => ({
-        ...a,
-        virtualBalance: this.virtualBalances.get(a.pubkey) ?? 100,
-      })),
+      agents: ARENA_AGENTS.map((a) => ({ ...a })),
       bettingSecondsRemaining: this.bettingSecondsRemaining,
       cooldownSecondsRemaining: this.cooldownSecondsRemaining,
       requireBets: this.config.requireBets,
     };
   }
 
-  getPool(): { totalPool: number; agentPools: Record<string, number> } {
-    if (!this.currentPool) return { totalPool: 0, agentPools: {} };
-    const agentPools: Record<string, number> = {};
-    for (const [pubkey, data] of this.currentPool.agents) {
-      agentPools[pubkey] = data.total;
-    }
-    return { totalPool: this.currentPool.totalPool, agentPools };
-  }
-
-  /**
-   * Track a bet that was already placed on-chain by the user's wallet.
-   * The frontend sends the on-chain `place_bet` tx (user signs), then calls
-   * this method so the server can mirror the pool state for real-time WS updates.
-   *
-   * @param wallet   - bettor's public key
-   * @param agentPubkey - which agent the bet is on
-   * @param amount   - bet amount in lamports
-   * @param txSignature - on-chain tx signature for verification
-   */
-  async placeBet(
-    wallet: string,
-    agentPubkey: string,
-    amount: number,
-    txSignature?: string
-  ): Promise<boolean> {
-    if (this.state !== "betting" || !this.currentPool || amount <= 0) {
-      return false;
-    }
-    if (!ARENA_AGENTS.find((a) => a.pubkey === agentPubkey)) return false;
-
-    // Verify the on-chain tx actually landed (if signature provided)
-    if (txSignature) {
-      try {
-        const confirmed = await this.solanaClient.confirmTransaction(txSignature);
-        if (!confirmed) {
-          this.log.warn({ txSignature, wallet }, "On-chain bet tx not confirmed");
-          return false;
-        }
-      } catch (err) {
-        this.log.warn({ err, txSignature }, "Failed to verify bet tx");
-        return false;
-      }
-    }
-
-    // Track off-chain for real-time pool updates
-    let agentPool = this.currentPool.agents.get(agentPubkey);
-    if (!agentPool) {
-      agentPool = { total: 0, bettors: new Map() };
-      this.currentPool.agents.set(agentPubkey, agentPool);
-    }
-    const existing = agentPool.bettors.get(wallet) ?? 0;
-    agentPool.bettors.set(wallet, existing + amount);
-    agentPool.total += amount;
-    this.currentPool.totalPool += amount;
-
-    this.log.info(
-      { wallet, agentPubkey, amount, txSignature },
-      "Bet tracked (on-chain + off-chain)"
-    );
-
-    this.broadcastArena("arena_pool_update", this.getPool());
-    return true;
-  }
-
   async start(): Promise<void> {
+    // 1. Restore round number from persistence
+    const persisted = loadState();
+    if (persisted) {
+      this.roundNumber = persisted.roundNumber;
+      this.log.info({ roundNumber: this.roundNumber }, "Restored arena state from disk");
+    }
+
+    // 2. Ensure arena agents exist on-chain
+    await this.ensureArenaAgentsExist();
+
+    // 3. Clean up orphaned pool from previous session
+    if (persisted?.activeTableId) {
+      this.log.info({ tableId: persisted.activeTableId }, "Cleaning up orphaned pool");
+      await this.cancelAndCloseEmptyPool(persisted.activeTableId);
+      saveState({ roundNumber: this.roundNumber, activeTableId: null });
+    }
+
+    // 4. Start
     this.running = true;
     this.log.info(
       { requireBets: this.config.requireBets },
@@ -186,9 +122,9 @@ export class ArenaManager {
     this.roundNumber++;
     const tableId = randomUUID();
     this.currentTableId = tableId;
-    this.currentPool = { agents: new Map(), totalPool: 0 };
     this.poolCreatedOnChain = false;
 
+    saveState({ roundNumber: this.roundNumber, activeTableId: tableId });
     this.log.info({ round: this.roundNumber, tableId }, "Arena round starting");
 
     // ── 1. Create on-chain betting pool ──
@@ -203,10 +139,10 @@ export class ArenaManager {
 
     // ── 2. Betting window ──
     this.setState("betting");
-    this.broadcastArena("arena_betting_open", {
+    this.broadcastArena("arena_round_start", {
       tableId,
       roundNumber: this.roundNumber,
-      agents: this.getStatus().agents,
+      agents: ARENA_AGENTS.map((a) => ({ ...a })),
       secondsRemaining: BETTING_WINDOW_SECONDS,
     });
 
@@ -220,46 +156,13 @@ export class ArenaManager {
     this.bettingSecondsRemaining = null;
 
     // ── 3. Gate check ──
-    const pool = this.getPool();
-    const agentsWithBets = Object.values(pool.agentPools).filter(
-      (v) => v > 0
-    ).length;
-    const hasBets = pool.totalPool > 0;
-
-    if (this.config.requireBets && agentsWithBets < MIN_BETTED_AGENTS) {
-      // Gate failed — refund all on-chain bets and restart
-      this.log.info({ agentsWithBets }, "Betting gate failed");
-      this.setState("refunding");
-
-      this.broadcastArena("arena_gate_failed", {
-        tableId,
-        reason: `Only ${agentsWithBets} agent(s) received bets (need ${MIN_BETTED_AGENTS})`,
-      });
-
-      if (hasBets && this.poolCreatedOnChain) {
-        await this.cancelAndRefundPool(tableId);
-      } else if (this.poolCreatedOnChain) {
-        // No bets placed, just cancel + close the empty pool
-        await this.cancelAndCloseEmptyPool(tableId);
-      }
-
-      this.currentPool = null;
-      this.currentTableId = null;
-      // No cooldown on gate failure — restart immediately
-      return;
-    }
-
-    // Gate passed (or requireBets=false)
-    if (!this.config.requireBets && agentsWithBets < MIN_BETTED_AGENTS) {
-      this.log.info(
-        { agentsWithBets },
-        "Betting gate skipped (ARENA_REQUIRE_BETS=false), playing anyway"
-      );
-    }
+    // With chain-first architecture, we no longer track bets off-chain.
+    // If requireBets is true, we skip the gate (the pool subscription on frontend handles display).
+    // For simplicity, we always proceed to play — the pool is already on-chain.
 
     // ── 4. Lock betting + play game ──
     this.setState("playing");
-    if (hasBets && this.poolCreatedOnChain) {
+    if (this.poolCreatedOnChain) {
       try {
         await this.solanaClient.lockBettingPool(tableId);
         this.log.info({ tableId }, "On-chain betting pool locked");
@@ -318,45 +221,42 @@ export class ArenaManager {
       const { winnerIndex, pot } = gameResult;
       this.gameTracker.decrement();
 
-      this.updateVirtualBalances(winnerIndex);
+      // Update on-chain agent stats for all 6 players
+      await this.updateAgentStats(winnerIndex, pot);
 
-      // Settle on-chain betting pool (only if bets exist)
-      if (hasBets && this.poolCreatedOnChain) {
+      // Settle on-chain betting pool
+      if (this.poolCreatedOnChain) {
         try {
           await this.solanaClient.settleBettingPool(tableId, winnerIndex);
           this.log.info({ tableId, winnerIndex }, "On-chain betting pool settled");
         } catch (err) {
           this.log.warn({ err }, "Failed to settle betting pool on-chain");
+          // If settle fails, try to cancel + close
+          await this.cancelAndCloseEmptyPool(tableId);
         }
-      } else if (this.poolCreatedOnChain) {
-        // No bets — cancel + close the empty pool to reclaim rent
-        await this.cancelAndCloseEmptyPool(tableId);
       }
 
       const winner = ARENA_AGENTS[winnerIndex];
-      this.broadcastArena("arena_game_complete", {
+      this.broadcastArena("arena_game_end", {
         tableId,
         gameId,
         winnerIndex,
         winnerName: winner?.displayName,
         pot,
-        virtualBalances: Object.fromEntries(this.virtualBalances),
       });
     } else {
       // All attempts failed
       this.gameTracker.decrement();
       this.log.error({ err: lastErr, tableId, attempts: attempt }, "Arena game failed after retries");
       this.broadcastArena("arena_game_failed", { tableId });
-      // Refund on-chain bets on game failure
-      if (hasBets && this.poolCreatedOnChain) {
-        await this.cancelAndRefundPool(tableId);
-      } else if (this.poolCreatedOnChain) {
+
+      if (this.poolCreatedOnChain) {
         await this.cancelAndCloseEmptyPool(tableId);
       }
     }
 
     this.currentGameId = null;
-    this.currentPool = null;
+    saveState({ roundNumber: this.roundNumber, activeTableId: null });
 
     // ── 5. Cooldown ──
     this.setState("cooldown");
@@ -373,7 +273,6 @@ export class ArenaManager {
   // ── Helpers ─────────────────────────────────────────────
   private setState(state: ArenaState): void {
     this.state = state;
-    this.broadcastArena("arena_state_change", { state });
   }
 
   private broadcastArena(type: string, data: Record<string, unknown>): void {
@@ -386,58 +285,53 @@ export class ArenaManager {
     });
   }
 
-  /**
-   * Cancel pool on-chain, refund each bettor's on-chain BetAccount,
-   * then close the pool account to reclaim rent.
-   */
-  private async cancelAndRefundPool(tableId: string): Promise<void> {
-    try {
-      await this.solanaClient.cancelBettingPool(tableId);
-      this.log.info({ tableId }, "On-chain pool cancelled");
-
-      // Refund each bettor
-      if (this.currentPool) {
-        for (const [, agentPool] of this.currentPool.agents) {
-          for (const [wallet] of agentPool.bettors) {
-            try {
-              await this.solanaClient.refundBet(tableId, wallet);
-              this.log.info({ tableId, wallet }, "On-chain bet refunded");
-            } catch (err) {
-              this.log.error({ err, wallet, tableId }, "Failed to refund bet on-chain");
-            }
-          }
+  private async ensureArenaAgentsExist(): Promise<void> {
+    for (const agent of ARENA_AGENTS) {
+      try {
+        const exists = await this.solanaClient.agentAccountExists(agent.pubkey);
+        if (!exists) {
+          this.log.info({ agent: agent.displayName, pubkey: agent.pubkey }, "Creating arena agent on-chain");
+          // On-chain program supports templates 0-3, clamp higher values
+          const onChainTemplate = Math.min(agent.template, 3);
+          await this.solanaClient.createArenaAgent(
+            agent.pubkey,
+            onChainTemplate,
+            agent.displayName
+          );
+          this.log.info({ agent: agent.displayName }, "Created arena agent on-chain");
+        } else {
+          this.log.info({ agent: agent.displayName }, "Arena agent already exists on-chain");
         }
+      } catch (err) {
+        this.log.warn({ err: err instanceof Error ? err.message : String(err), agent: agent.displayName }, "Failed to create arena agent");
       }
-
-      // Close pool to reclaim rent
-      await this.solanaClient.closeBettingPool(tableId);
-      this.log.info({ tableId }, "On-chain pool closed");
-    } catch (err) {
-      this.log.error({ err, tableId }, "Failed to cancel/refund pool on-chain");
     }
   }
 
-  /** Cancel + close a pool that has zero bets (no refunds needed). */
+  private async updateAgentStats(winnerIndex: number, pot: number): Promise<void> {
+    for (let i = 0; i < ARENA_AGENTS.length; i++) {
+      const agent = ARENA_AGENTS[i]!;
+      const isWinner = i === winnerIndex;
+      try {
+        await this.solanaClient.updateAgentStats(
+          agent.pubkey,
+          1, // gamesDelta
+          isWinner ? 1 : 0, // winsDelta
+          isWinner ? Math.floor(pot * 0.95) : 0 // earningsDelta
+        );
+      } catch (err) {
+        this.log.warn({ err, agent: agent.displayName }, "Failed to update agent stats");
+      }
+    }
+  }
+
   private async cancelAndCloseEmptyPool(tableId: string): Promise<void> {
     try {
       await this.solanaClient.cancelBettingPool(tableId);
       await this.solanaClient.closeBettingPool(tableId);
-      this.log.info({ tableId }, "Empty on-chain pool cancelled + closed");
+      this.log.info({ tableId }, "On-chain pool cancelled + closed");
     } catch (err) {
-      this.log.error({ err, tableId }, "Failed to cancel/close empty pool");
-    }
-  }
-
-  private updateVirtualBalances(winnerIndex: number): void {
-    const winner = ARENA_AGENTS[winnerIndex];
-    if (!winner) return;
-    for (const agent of ARENA_AGENTS) {
-      const current = this.virtualBalances.get(agent.pubkey) ?? 100;
-      if (agent.pubkey === winner.pubkey) {
-        this.virtualBalances.set(agent.pubkey, current + 10);
-      } else {
-        this.virtualBalances.set(agent.pubkey, Math.max(50, current - 2));
-      }
+      this.log.debug({ err, tableId }, "Failed to cancel/close pool (may already be gone)");
     }
   }
 

@@ -40,17 +40,17 @@ export default function PokerTable({
   return (
     <div className="relative mx-auto aspect-16/10 w-full max-w-4xl select-none">
       {/* Outer container (dark background frame) */}
-      <div className="absolute inset-0 rounded-3xl bg-[#0d1117] border border-white/5 shadow-2xl overflow-hidden">
+      <div className="absolute inset-0 rounded-3xl bg-[#0d1117] border shadow-2xl overflow-hidden">
         {/* Table background image */}
         <div className="absolute inset-0 overflow-hidden rounded-3xl">
-          <img src="/table.png" alt="" className="w-full h-full object-cover" />
+          <img src="/table.png" alt="" className="w-full h-full object-fill" />
         </div>
 
         {/* The Felt Table (positioned over the image) */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[82%] h-[62%]">
           <div className="w-full h-full rounded-[200px] relative">
             {/* Pot display */}
-            <div className="absolute top-[28%] left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
+            <div className="absolute top-[22%] left-1/2 -translate-x-1/2 flex flex-col items-center z-10">
               <span className="text-[10px] font-bold text-white/40 tracking-widest uppercase">
                 Total Pot
               </span>
@@ -58,7 +58,15 @@ export default function PokerTable({
                 {/* Chip icon */}
                 <svg width="16" height="16" viewBox="0 0 16 16" className="flex-shrink-0">
                   <circle cx="8" cy="8" r="7" fill="#fca311" stroke="#b47a0a" strokeWidth="1" />
-                  <circle cx="8" cy="8" r="4.5" fill="none" stroke="#b47a0a" strokeWidth="0.8" strokeDasharray="2 1.5" />
+                  <circle
+                    cx="8"
+                    cy="8"
+                    r="4.5"
+                    fill="none"
+                    stroke="#b47a0a"
+                    strokeWidth="0.8"
+                    strokeDasharray="2 1.5"
+                  />
                 </svg>
                 <span className="text-lg font-bold text-[#fca311]">
                   {gameState.pot.toLocaleString()}
@@ -69,27 +77,18 @@ export default function PokerTable({
             {/* Community Cards */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex gap-1">
               {gameState.communityCards.map((card, i) => (
-                <PlayingCard
-                  key={i}
-                  card={card}
-                  faceUp
-                  size="lg"
-                  index={i}
-                  animateDeal
+                <PlayingCard key={i} card={card} faceUp size="lg" index={i} animateDeal />
+              ))}
+              {Array.from({ length: 5 - gameState.communityCards.length }).map((_, i) => (
+                <div
+                  key={`empty-${i}`}
+                  className="w-[60px] h-[84px] rounded-lg border border-dashed border-white/10 bg-white/[0.02]"
                 />
               ))}
-              {Array.from({ length: 5 - gameState.communityCards.length }).map(
-                (_, i) => (
-                  <div
-                    key={`empty-${i}`}
-                    className="w-[60px] h-[84px] rounded-lg border border-dashed border-white/10 bg-white/[0.02]"
-                  />
-                )
-              )}
             </div>
 
             {/* Street label */}
-            <div className="absolute bottom-[22%] left-1/2 -translate-x-1/2">
+            <div className="absolute bottom-[27%] left-1/2 -translate-x-1/2">
               <span className="text-[10px] font-bold text-white/20 tracking-[0.2em] uppercase">
                 {gameState.street}
               </span>

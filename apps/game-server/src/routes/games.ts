@@ -12,26 +12,6 @@ export default async function gameRoutes(
 ): Promise<void> {
   const app = fastify.withTypeProvider<TypeBoxTypeProvider>();
 
-  fastify.get<{ Params: { gameId: string } }>(
-    "/games/:gameId",
-    {
-      schema: {
-        params: Type.Object({ gameId: Type.String() }),
-      },
-    },
-    async (request, reply) => {
-      const state = fastify.orchestrator.getGameState(
-        request.params.gameId
-      );
-      if (!state) {
-        return reply
-          .status(404)
-          .send({ statusCode: 404, message: "Game not found" });
-      }
-      return state;
-    }
-  );
-
   app.get(
     "/games/agent/:pubkey",
     {

@@ -25,7 +25,7 @@ const AGENT_SEEDS = [
   "arena-agent-wolf",
 ];
 
-const AGENT_KEYPAIRS = AGENT_SEEDS.map(deriveKeypair);
+export const AGENT_KEYPAIRS = AGENT_SEEDS.map(deriveKeypair);
 
 export const ARENA_AGENTS: ArenaAgentConfig[] = [
   {
