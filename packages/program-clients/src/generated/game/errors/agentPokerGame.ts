@@ -36,11 +36,17 @@ export const AGENT_POKER_GAME_ERROR__INVALID_DECK = 0x1778; // 6008
 export const AGENT_POKER_GAME_ERROR__INVALID_SEAT_INDEX = 0x1779; // 6009
 /** SeatTaken: Seat is already taken */
 export const AGENT_POKER_GAME_ERROR__SEAT_TAKEN = 0x177a; // 6010
+/** InvalidHandCount: Wrong number of hand accounts in remaining_accounts */
+export const AGENT_POKER_GAME_ERROR__INVALID_HAND_COUNT = 0x177b; // 6011
+/** InvalidHandAccount: Hand account PDA does not match expected derivation */
+export const AGENT_POKER_GAME_ERROR__INVALID_HAND_ACCOUNT = 0x177c; // 6012
 
 export type AgentPokerGameError =
   | typeof AGENT_POKER_GAME_ERROR__CANNOT_CHECK
   | typeof AGENT_POKER_GAME_ERROR__INVALID_ACTION
   | typeof AGENT_POKER_GAME_ERROR__INVALID_DECK
+  | typeof AGENT_POKER_GAME_ERROR__INVALID_HAND_ACCOUNT
+  | typeof AGENT_POKER_GAME_ERROR__INVALID_HAND_COUNT
   | typeof AGENT_POKER_GAME_ERROR__INVALID_PHASE
   | typeof AGENT_POKER_GAME_ERROR__INVALID_PLAYER_COUNT
   | typeof AGENT_POKER_GAME_ERROR__INVALID_SEAT_INDEX
@@ -58,6 +64,8 @@ if (process.env.NODE_ENV !== "production") {
     [AGENT_POKER_GAME_ERROR__CANNOT_CHECK]: `Cannot check when there is an outstanding bet`,
     [AGENT_POKER_GAME_ERROR__INVALID_ACTION]: `Invalid action type`,
     [AGENT_POKER_GAME_ERROR__INVALID_DECK]: `Deck must be exactly 52 cards`,
+    [AGENT_POKER_GAME_ERROR__INVALID_HAND_ACCOUNT]: `Hand account PDA does not match expected derivation`,
+    [AGENT_POKER_GAME_ERROR__INVALID_HAND_COUNT]: `Wrong number of hand accounts in remaining_accounts`,
     [AGENT_POKER_GAME_ERROR__INVALID_PHASE]: `Invalid game phase for this action`,
     [AGENT_POKER_GAME_ERROR__INVALID_PLAYER_COUNT]: `Invalid player count (must be 2-6)`,
     [AGENT_POKER_GAME_ERROR__INVALID_SEAT_INDEX]: `Invalid seat index`,

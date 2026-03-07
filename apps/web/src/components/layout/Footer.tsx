@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const navLinks = [
@@ -53,13 +54,8 @@ export default function Footer() {
       <div className="flex flex-col items-center lg:flex-row lg:items-center h-auto lg:h-[6.5rem] mb-6 border-b border-neutral-500 pb-6 lg:pb-0 max-w-[77.5rem] mx-auto">
         <Link href="/" className="block mb-6 lg:mb-0">
           <span className="flex items-center gap-2">
-            <span className="text-2xl">{"\u2660"}</span>
-            <span
-              className="text-xl font-bold bg-clip-text text-transparent"
-              style={{ backgroundImage: "linear-gradient(to right, #AC6AFF, #FF98E2, #FFC876)" }}
-            >
-              AgentPoker
-            </span>
+            <Image src="/icon.png" alt="logo" width={48} height={48} />
+            <span className="text-3xl font-bold text-forground font-grotesk">AgentPoker</span>
           </span>
         </Link>
 

@@ -306,14 +306,11 @@ export function adaptWsMessage(raw: BackendWsMessage): AdaptedWsMessage {
       break;
     }
     case "pool_update": {
+      // Server stores amounts in SOL already, no conversion needed
       const data = raw.data as { totalPool: number; agentPools: Record<string, number> };
-      const convertedPools: Record<string, number> = {};
-      for (const [key, val] of Object.entries(data.agentPools)) {
-        convertedPools[key] = lamportsToSol(val);
-      }
       result.poolData = {
-        totalPool: lamportsToSol(data.totalPool),
-        agentPools: convertedPools,
+        totalPool: data.totalPool,
+        agentPools: data.agentPools,
       };
       break;
     }

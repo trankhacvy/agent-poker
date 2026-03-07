@@ -104,7 +104,6 @@ export type InitializeTreasuryAsyncInput<
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
-  /** Validated by seeds constraint. */
   treasury?: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
 };
@@ -183,7 +182,6 @@ export type InitializeTreasuryInput<
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
-  /** Validated by seeds constraint. */
   treasury: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
 };
@@ -251,7 +249,6 @@ export type ParsedInitializeTreasuryInstruction<
   programAddress: Address<TProgram>;
   accounts: {
     authority: TAccountMetas[0];
-    /** Validated by seeds constraint. */
     treasury: TAccountMetas[1];
     systemProgram: TAccountMetas[2];
   };

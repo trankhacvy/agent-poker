@@ -21,10 +21,9 @@ import {
   parseCommitGameInstruction,
   parseCreateGameInstruction,
   parseCreateGameTestInstruction,
-  parseCreatePermissionInstruction,
   parseDealCardsInstruction,
-  parseDelegatePdaInstruction,
   parseJoinGameInstruction,
+  parseJoinGameTestInstruction,
   parsePlayerActionInstruction,
   parseProcessUndelegationInstruction,
   parseRequestShuffleInstruction,
@@ -35,10 +34,9 @@ import {
   type ParsedCommitGameInstruction,
   type ParsedCreateGameInstruction,
   type ParsedCreateGameTestInstruction,
-  type ParsedCreatePermissionInstruction,
   type ParsedDealCardsInstruction,
-  type ParsedDelegatePdaInstruction,
   type ParsedJoinGameInstruction,
+  type ParsedJoinGameTestInstruction,
   type ParsedPlayerActionInstruction,
   type ParsedProcessUndelegationInstruction,
   type ParsedRequestShuffleInstruction,
@@ -91,10 +89,9 @@ export enum AgentPokerGameInstruction {
   CommitGame,
   CreateGame,
   CreateGameTest,
-  CreatePermission,
   DealCards,
-  DelegatePda,
   JoinGame,
+  JoinGameTest,
   PlayerAction,
   ProcessUndelegation,
   RequestShuffle,
@@ -155,17 +152,6 @@ export function identifyAgentPokerGameInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([190, 182, 26, 164, 156, 221, 8, 0]),
-      ),
-      0,
-    )
-  ) {
-    return AgentPokerGameInstruction.CreatePermission;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([38, 218, 247, 103, 218, 237, 24, 65]),
       ),
       0,
@@ -177,23 +163,23 @@ export function identifyAgentPokerGameInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([248, 217, 193, 46, 124, 191, 64, 135]),
-      ),
-      0,
-    )
-  ) {
-    return AgentPokerGameInstruction.DelegatePda;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([107, 112, 18, 38, 56, 173, 60, 128]),
       ),
       0,
     )
   ) {
     return AgentPokerGameInstruction.JoinGame;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([78, 253, 179, 121, 142, 227, 33, 193]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerGameInstruction.JoinGameTest;
   }
   if (
     containsBytes(
@@ -282,17 +268,14 @@ export type ParsedAgentPokerGameInstruction<
       instructionType: AgentPokerGameInstruction.CreateGameTest;
     } & ParsedCreateGameTestInstruction<TProgram>)
   | ({
-      instructionType: AgentPokerGameInstruction.CreatePermission;
-    } & ParsedCreatePermissionInstruction<TProgram>)
-  | ({
       instructionType: AgentPokerGameInstruction.DealCards;
     } & ParsedDealCardsInstruction<TProgram>)
   | ({
-      instructionType: AgentPokerGameInstruction.DelegatePda;
-    } & ParsedDelegatePdaInstruction<TProgram>)
-  | ({
       instructionType: AgentPokerGameInstruction.JoinGame;
     } & ParsedJoinGameInstruction<TProgram>)
+  | ({
+      instructionType: AgentPokerGameInstruction.JoinGameTest;
+    } & ParsedJoinGameTestInstruction<TProgram>)
   | ({
       instructionType: AgentPokerGameInstruction.PlayerAction;
     } & ParsedPlayerActionInstruction<TProgram>)
@@ -345,13 +328,6 @@ export function parseAgentPokerGameInstruction<TProgram extends string>(
         ...parseCreateGameTestInstruction(instruction),
       };
     }
-    case AgentPokerGameInstruction.CreatePermission: {
-      assertIsInstructionWithAccounts(instruction);
-      return {
-        instructionType: AgentPokerGameInstruction.CreatePermission,
-        ...parseCreatePermissionInstruction(instruction),
-      };
-    }
     case AgentPokerGameInstruction.DealCards: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -359,18 +335,18 @@ export function parseAgentPokerGameInstruction<TProgram extends string>(
         ...parseDealCardsInstruction(instruction),
       };
     }
-    case AgentPokerGameInstruction.DelegatePda: {
-      assertIsInstructionWithAccounts(instruction);
-      return {
-        instructionType: AgentPokerGameInstruction.DelegatePda,
-        ...parseDelegatePdaInstruction(instruction),
-      };
-    }
     case AgentPokerGameInstruction.JoinGame: {
       assertIsInstructionWithAccounts(instruction);
       return {
         instructionType: AgentPokerGameInstruction.JoinGame,
         ...parseJoinGameInstruction(instruction),
+      };
+    }
+    case AgentPokerGameInstruction.JoinGameTest: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerGameInstruction.JoinGameTest,
+        ...parseJoinGameTestInstruction(instruction),
       };
     }
     case AgentPokerGameInstruction.PlayerAction: {

@@ -14,6 +14,8 @@ import {
   getBytesEncoder,
   getStructDecoder,
   getStructEncoder,
+  getU64Decoder,
+  getU64Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -25,29 +27,27 @@ import {
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
-  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
+  type WritableSignerAccount,
 } from "@solana/kit";
 import { AGENT_POKER_ESCROW_PROGRAM_ADDRESS } from "../programs";
 import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 
-export const REFUND_TABLE_DISCRIMINATOR = new Uint8Array([
-  139, 63, 78, 205, 150, 151, 137, 230,
+export const DEPOSIT_DISCRIMINATOR = new Uint8Array([
+  242, 35, 198, 137, 82, 225, 242, 182,
 ]);
 
-export function getRefundTableDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    REFUND_TABLE_DISCRIMINATOR,
-  );
+export function getDepositDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(DEPOSIT_DISCRIMINATOR);
 }
 
-export type RefundTableInstruction<
+export type DepositInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
-  TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountTable extends string | AccountMeta<string> = string,
-  TAccountTableVault extends string | AccountMeta<string> = string,
+  TAccountDepositor extends string | AccountMeta<string> = string,
+  TAccountSession extends string | AccountMeta<string> = string,
+  TAccountSessionVault extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -55,16 +55,16 @@ export type RefundTableInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountAuthority extends string
-        ? ReadonlySignerAccount<TAccountAuthority> &
-            AccountSignerMeta<TAccountAuthority>
-        : TAccountAuthority,
-      TAccountTable extends string
-        ? WritableAccount<TAccountTable>
-        : TAccountTable,
-      TAccountTableVault extends string
-        ? WritableAccount<TAccountTableVault>
-        : TAccountTableVault,
+      TAccountDepositor extends string
+        ? WritableSignerAccount<TAccountDepositor> &
+            AccountSignerMeta<TAccountDepositor>
+        : TAccountDepositor,
+      TAccountSession extends string
+        ? WritableAccount<TAccountSession>
+        : TAccountSession,
+      TAccountSessionVault extends string
+        ? WritableAccount<TAccountSessionVault>
+        : TAccountSessionVault,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -72,65 +72,72 @@ export type RefundTableInstruction<
     ]
   >;
 
-export type RefundTableInstructionData = { discriminator: ReadonlyUint8Array };
+export type DepositInstructionData = {
+  discriminator: ReadonlyUint8Array;
+  amount: bigint;
+};
 
-export type RefundTableInstructionDataArgs = {};
+export type DepositInstructionDataArgs = { amount: number | bigint };
 
-export function getRefundTableInstructionDataEncoder(): FixedSizeEncoder<RefundTableInstructionDataArgs> {
+export function getDepositInstructionDataEncoder(): FixedSizeEncoder<DepositInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: REFUND_TABLE_DISCRIMINATOR }),
+    getStructEncoder([
+      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
+      ["amount", getU64Encoder()],
+    ]),
+    (value) => ({ ...value, discriminator: DEPOSIT_DISCRIMINATOR }),
   );
 }
 
-export function getRefundTableInstructionDataDecoder(): FixedSizeDecoder<RefundTableInstructionData> {
+export function getDepositInstructionDataDecoder(): FixedSizeDecoder<DepositInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
+    ["amount", getU64Decoder()],
   ]);
 }
 
-export function getRefundTableInstructionDataCodec(): FixedSizeCodec<
-  RefundTableInstructionDataArgs,
-  RefundTableInstructionData
+export function getDepositInstructionDataCodec(): FixedSizeCodec<
+  DepositInstructionDataArgs,
+  DepositInstructionData
 > {
   return combineCodec(
-    getRefundTableInstructionDataEncoder(),
-    getRefundTableInstructionDataDecoder(),
+    getDepositInstructionDataEncoder(),
+    getDepositInstructionDataDecoder(),
   );
 }
 
-export type RefundTableInput<
-  TAccountAuthority extends string = string,
-  TAccountTable extends string = string,
-  TAccountTableVault extends string = string,
+export type DepositInput<
+  TAccountDepositor extends string = string,
+  TAccountSession extends string = string,
+  TAccountSessionVault extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
-  authority: TransactionSigner<TAccountAuthority>;
-  table: Address<TAccountTable>;
-  /** Lamports are manipulated directly since this program controls the PDA. */
-  tableVault: Address<TAccountTableVault>;
+  depositor: TransactionSigner<TAccountDepositor>;
+  session: Address<TAccountSession>;
+  sessionVault: Address<TAccountSessionVault>;
   systemProgram?: Address<TAccountSystemProgram>;
+  amount: DepositInstructionDataArgs["amount"];
 };
 
-export function getRefundTableInstruction<
-  TAccountAuthority extends string,
-  TAccountTable extends string,
-  TAccountTableVault extends string,
+export function getDepositInstruction<
+  TAccountDepositor extends string,
+  TAccountSession extends string,
+  TAccountSessionVault extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
 >(
-  input: RefundTableInput<
-    TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+  input: DepositInput<
+    TAccountDepositor,
+    TAccountSession,
+    TAccountSessionVault,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): RefundTableInstruction<
+): DepositInstruction<
   TProgramAddress,
-  TAccountAuthority,
-  TAccountTable,
-  TAccountTableVault,
+  TAccountDepositor,
+  TAccountSession,
+  TAccountSessionVault,
   TAccountSystemProgram
 > {
   // Program address.
@@ -139,15 +146,18 @@ export function getRefundTableInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: false },
-    table: { value: input.table ?? null, isWritable: true },
-    tableVault: { value: input.tableVault ?? null, isWritable: true },
+    depositor: { value: input.depositor ?? null, isWritable: true },
+    session: { value: input.session ?? null, isWritable: true },
+    sessionVault: { value: input.sessionVault ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
+
+  // Original args.
+  const args = { ...input };
 
   // Resolve default values.
   if (!accounts.systemProgram.value) {
@@ -158,45 +168,46 @@ export function getRefundTableInstruction<
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
     accounts: [
-      getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.table),
-      getAccountMeta(accounts.tableVault),
+      getAccountMeta(accounts.depositor),
+      getAccountMeta(accounts.session),
+      getAccountMeta(accounts.sessionVault),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getRefundTableInstructionDataEncoder().encode({}),
+    data: getDepositInstructionDataEncoder().encode(
+      args as DepositInstructionDataArgs,
+    ),
     programAddress,
-  } as RefundTableInstruction<
+  } as DepositInstruction<
     TProgramAddress,
-    TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountDepositor,
+    TAccountSession,
+    TAccountSessionVault,
     TAccountSystemProgram
   >);
 }
 
-export type ParsedRefundTableInstruction<
+export type ParsedDepositInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    authority: TAccountMetas[0];
-    table: TAccountMetas[1];
-    /** Lamports are manipulated directly since this program controls the PDA. */
-    tableVault: TAccountMetas[2];
+    depositor: TAccountMetas[0];
+    session: TAccountMetas[1];
+    sessionVault: TAccountMetas[2];
     systemProgram: TAccountMetas[3];
   };
-  data: RefundTableInstructionData;
+  data: DepositInstructionData;
 };
 
-export function parseRefundTableInstruction<
+export function parseDepositInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedRefundTableInstruction<TProgram, TAccountMetas> {
+): ParsedDepositInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 4) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
@@ -210,11 +221,11 @@ export function parseRefundTableInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      authority: getNextAccount(),
-      table: getNextAccount(),
-      tableVault: getNextAccount(),
+      depositor: getNextAccount(),
+      session: getNextAccount(),
+      sessionVault: getNextAccount(),
       systemProgram: getNextAccount(),
     },
-    data: getRefundTableInstructionDataDecoder().decode(instruction.data),
+    data: getDepositInstructionDataDecoder().decode(instruction.data),
   };
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useAccount } from "@solana/connector";
 import type { PlayerSnapshot, UserBet, BettingResult, GamePhase } from "@/lib/types";
 import { placeBet } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { TEMPLATES } from "@/lib/constants";
 
 type PlaceBetFn = (params: {
   wallet: string;
@@ -16,6 +17,7 @@ type PlaceBetFn = (params: {
 }) => Promise<{ success: boolean }>;
 
 const BETTING_WINDOW_TOTAL = 60;
+const PAYOUT_MULTIPLIER = 5.7; // 6 agents * 0.95 rake
 
 interface BettingPanelProps {
   tableId: string;
@@ -27,6 +29,9 @@ interface BettingPanelProps {
   bettingCountdown: number | null;
   bettingLocked: boolean;
   onPlaceBet?: PlaceBetFn;
+  onClaimWinnings?: () => Promise<string>;
+  userBet?: UserBet | null;
+  onUserBetChange?: (bet: UserBet | null) => void;
 }
 
 export default function BettingPanel({
@@ -39,14 +44,25 @@ export default function BettingPanel({
   bettingCountdown,
   bettingLocked,
   onPlaceBet,
+  onClaimWinnings,
+  userBet: externalUserBet,
+  onUserBetChange,
 }: BettingPanelProps) {
-  const { connected, publicKey } = useWallet();
+  const { address: walletAddress, connected } = useAccount();
   const [selectedAgent, setSelectedAgent] = useState("");
   const [betAmount, setBetAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [userBet, setUserBet] = useState<UserBet | null>(null);
+  const [internalUserBet, setInternalUserBet] = useState<UserBet | null>(null);
   const [bettingResult, setBettingResult] = useState<BettingResult | null>(null);
+  const [claimed, setClaimed] = useState(false);
+
+  // Use external state if provided, otherwise use internal
+  const userBet = externalUserBet !== undefined ? externalUserBet : internalUserBet;
+  const setUserBet = (bet: UserBet | null) => {
+    setInternalUserBet(bet);
+    onUserBetChange?.(bet);
+  };
 
   const activePlayers = players.filter((p) => p.status !== "folded");
 
@@ -57,26 +73,23 @@ export default function BettingPanel({
   useEffect(() => {
     if (gamePhase === "complete" && userBet && winnerPublicKey) {
       const won = userBet.agentPublicKey === winnerPublicKey;
-      const agentPool = agentPools[userBet.agentPublicKey] ?? 0;
-      const payout = won && agentPool > 0 ? (userBet.amount / agentPool) * poolTotal * 0.95 : 0;
+      const payout = won ? userBet.amount * PAYOUT_MULTIPLIER : 0;
       setBettingResult({ won, payout, betAmount: userBet.amount });
     }
-  }, [gamePhase, userBet, winnerPublicKey, agentPools, poolTotal]);
+  }, [gamePhase, userBet, winnerPublicKey]);
 
   function calculatePotentialPayout(): number {
     const bet = parseFloat(betAmount);
     if (!bet || !selectedAgent || bet <= 0) return 0;
-    const agentPool = (agentPools[selectedAgent] ?? 0) + bet;
-    const total = poolTotal + bet;
-    return (bet / agentPool) * total * 0.95;
+    return bet * PAYOUT_MULTIPLIER;
   }
 
   async function handlePlaceBet() {
-    if (!selectedAgent || !betAmount || bettingExpired || !publicKey) return;
+    if (!selectedAgent || !betAmount || bettingExpired || !walletAddress) return;
     setLoading(true);
     setError(null);
     try {
-      const wallet = publicKey.toBase58();
+      const wallet = walletAddress;
       const amount = parseFloat(betAmount);
       if (onPlaceBet) {
         await onPlaceBet({ wallet, agentPubkey: selectedAgent, amount });
@@ -98,9 +111,14 @@ export default function BettingPanel({
   }
 
   async function handleClaimWinnings() {
+    if (!onClaimWinnings) return;
     setLoading(true);
+    setError(null);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await onClaimWinnings();
+      setClaimed(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to claim winnings");
     } finally {
       setLoading(false);
     }
@@ -136,8 +154,10 @@ export default function BettingPanel({
                       : "bg-neutral-500/50"
                   }`}
                 >
-                  <span className="text-neutral-50">
-                    {isWinner && "\u{1F451} "}{player.displayName}
+                  <span className="flex items-center gap-2 text-neutral-50">
+                    {isWinner && "\u{1F451} "}
+                    <img src={TEMPLATES[player.templateId]?.avatar ?? "/icon.png"} alt={player.displayName} className="size-5 rounded-full object-cover" />
+                    {player.displayName}
                   </span>
                   <span className="text-neutral-200">{pool} SOL</span>
                 </div>
@@ -167,11 +187,16 @@ export default function BettingPanel({
                 You won {bettingResult.payout.toFixed(2)} SOL!
               </p>
               <p className="text-sm text-neutral-200">
-                Your bet: {bettingResult.betAmount} SOL
+                Your bet: {bettingResult.betAmount} SOL (5.7x payout)
               </p>
-              <Button onClick={handleClaimWinnings} disabled={loading}>
-                {loading ? "Claiming..." : "Claim Winnings"}
-              </Button>
+              {claimed ? (
+                <p className="text-sm font-medium text-green-400">Winnings claimed!</p>
+              ) : (
+                <Button onClick={handleClaimWinnings} disabled={loading || !onClaimWinnings}>
+                  {loading ? "Claiming..." : `Claim ${bettingResult.payout.toFixed(2)} SOL`}
+                </Button>
+              )}
+              {error && <p className="text-center text-sm text-destructive">{error}</p>}
             </>
           ) : (
             <>
@@ -202,8 +227,10 @@ export default function BettingPanel({
           </p>
           <div className="w-full rounded-xl bg-neutral-500/50 p-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-200">Total Pool</span>
-              <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
+              <span className="text-neutral-200">Potential Payout</span>
+              <span className="font-medium text-gold">
+                {(userBet.amount * PAYOUT_MULTIPLIER).toFixed(2)} SOL (5.7x)
+              </span>
             </div>
           </div>
           <p className="text-xs text-neutral-300">Waiting for game to finish...</p>
@@ -232,7 +259,10 @@ export default function BettingPanel({
                   key={player.publicKey}
                   className="flex items-center justify-between rounded-xl px-3 py-2 text-sm bg-neutral-500/50"
                 >
-                  <span className="text-neutral-50">{player.displayName}</span>
+                  <span className="flex items-center gap-2 text-neutral-50">
+                    <img src={TEMPLATES[player.templateId]?.avatar ?? "/icon.png"} alt={player.displayName} className="size-5 rounded-full object-cover" />
+                    {player.displayName}
+                  </span>
                   <span className="text-neutral-200">{pool} SOL</span>
                 </div>
               );
@@ -266,8 +296,8 @@ export default function BettingPanel({
         </div>
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-neutral-200">Total Pool</span>
-          <span className="font-medium text-gold">{poolTotal.toLocaleString()} SOL</span>
+          <span className="text-neutral-200">Payout</span>
+          <span className="font-medium text-gold">5.7x</span>
         </div>
 
         <div className="flex flex-col gap-2">
@@ -286,7 +316,10 @@ export default function BettingPanel({
                   onClick={() => setSelectedAgent(player.publicKey)}
                   disabled={bettingExpired}
                 >
-                  <span className="text-neutral-50">{player.displayName}</span>
+                  <span className="flex items-center gap-2 text-neutral-50">
+                    <img src={TEMPLATES[player.templateId]?.avatar ?? "/icon.png"} alt={player.displayName} className="size-5 rounded-full object-cover" />
+                    {player.displayName}
+                  </span>
                   <span className="text-neutral-200">{pool} SOL</span>
                 </button>
               );

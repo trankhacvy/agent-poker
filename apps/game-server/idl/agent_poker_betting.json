@@ -106,28 +106,22 @@
           ]
         },
         {
-          "name": "pool_vault",
+          "name": "treasury",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  112,
-                  111,
-                  111,
-                  108,
-                  95,
-                  118,
+                  116,
+                  114,
+                  101,
                   97,
+                  115,
                   117,
-                  108,
-                  116
+                  114,
+                  121
                 ]
-              },
-              {
-                "kind": "account",
-                "path": "pool"
               }
             ]
           }
@@ -161,12 +155,7 @@
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "winning_pool_total",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "close_pool",
@@ -341,6 +330,57 @@
       ]
     },
     {
+      "name": "fund_treasury",
+      "discriminator": [
+        71,
+        154,
+        45,
+        220,
+        206,
+        32,
+        174,
+        239
+      ],
+      "accounts": [
+        {
+          "name": "funder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "treasury",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "lock_pool",
       "discriminator": [
         154,
@@ -456,6 +496,26 @@
               {
                 "kind": "account",
                 "path": "pool"
+              }
+            ]
+          }
+        },
+        {
+          "name": "treasury",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  101,
+                  97,
+                  115,
+                  117,
+                  114,
+                  121
+                ]
               }
             ]
           }
@@ -901,6 +961,11 @@
       "code": 6015,
       "name": "PoolStillActive",
       "msg": "Pool is still active (must be Settled or Cancelled)"
+    },
+    {
+      "code": 6016,
+      "name": "InsufficientTreasuryFunds",
+      "msg": "Insufficient treasury funds to cover payout"
     }
   ],
   "types": [
@@ -1078,10 +1143,6 @@
           },
           {
             "name": "total_pool",
-            "type": "u64"
-          },
-          {
-            "name": "rake",
             "type": "u64"
           }
         ]

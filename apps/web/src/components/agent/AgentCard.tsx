@@ -8,8 +8,6 @@ interface AgentCardProps {
   onWithdraw: (publicKey: string) => void;
 }
 
-const templateEmojis = ["🦈", "🔥", "🪨", "🦊"];
-
 export default function AgentCard({ agent, onFund, onWithdraw }: AgentCardProps) {
   const template = TEMPLATES[agent.templateId];
 
@@ -18,10 +16,10 @@ export default function AgentCard({ agent, onFund, onWithdraw }: AgentCardProps)
       {/* Header */}
       <div className="flex items-center gap-3 p-5 border-b border-neutral-50/10">
         <div
-          className="flex h-12 w-12 items-center justify-center rounded-xl text-2xl"
+          className="flex h-12 w-12 items-center justify-center rounded-xl overflow-hidden"
           style={{ backgroundColor: `${template.color}20` }}
         >
-          {templateEmojis[agent.templateId]}
+          <img src={template.avatar} alt={template.name} className="w-full h-full object-cover" />
         </div>
         <div>
           <h3 className="font-semibold text-neutral-50">{agent.displayName}</h3>

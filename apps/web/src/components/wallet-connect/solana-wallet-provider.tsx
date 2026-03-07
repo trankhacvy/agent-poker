@@ -19,7 +19,7 @@ export interface SolanaWalletProviderProps {
 export function SolanaWalletProvider({
   children,
   appName = "My App",
-  cluster = "mainnet-beta",
+  cluster = "devnet",
   walletConnectProjectId,
   autoConnect = true,
   queryClient: externalQueryClient,
@@ -41,6 +41,13 @@ export function SolanaWalletProvider({
       getDefaultConfig({
         appName,
         network: cluster,
+        clusters: [
+          {
+            id: "solana:devnet" as const,
+            label: "Devnet",
+            url: process.env.NEXT_PUBLIC_SOLANA_RPC_URL!,
+          },
+        ],
         autoConnect,
         walletConnect: walletConnectProjectId
           ? {

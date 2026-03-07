@@ -17,15 +17,23 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
+  parseCancelPoolInstruction,
   parseClaimWinningsInstruction,
+  parseClosePoolInstruction,
   parseCreatePoolInstruction,
+  parseFundTreasuryInstruction,
   parseLockPoolInstruction,
   parsePlaceBetInstruction,
+  parseRefundBetInstruction,
   parseSettlePoolInstruction,
+  type ParsedCancelPoolInstruction,
   type ParsedClaimWinningsInstruction,
+  type ParsedClosePoolInstruction,
   type ParsedCreatePoolInstruction,
+  type ParsedFundTreasuryInstruction,
   type ParsedLockPoolInstruction,
   type ParsedPlaceBetInstruction,
+  type ParsedRefundBetInstruction,
   type ParsedSettlePoolInstruction,
 } from "../instructions";
 
@@ -69,10 +77,14 @@ export function identifyAgentPokerBettingAccount(
 }
 
 export enum AgentPokerBettingInstruction {
+  CancelPool,
   ClaimWinnings,
+  ClosePool,
   CreatePool,
+  FundTreasury,
   LockPool,
   PlaceBet,
+  RefundBet,
   SettlePool,
 }
 
@@ -80,6 +92,17 @@ export function identifyAgentPokerBettingInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): AgentPokerBettingInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([211, 11, 27, 100, 252, 115, 57, 77]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerBettingInstruction.CancelPool;
+  }
   if (
     containsBytes(
       data,
@@ -95,12 +118,34 @@ export function identifyAgentPokerBettingInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([140, 189, 209, 23, 239, 62, 239, 11]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerBettingInstruction.ClosePool;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([233, 146, 209, 142, 207, 104, 64, 188]),
       ),
       0,
     )
   ) {
     return AgentPokerBettingInstruction.CreatePool;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([71, 154, 45, 220, 206, 32, 174, 239]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerBettingInstruction.FundTreasury;
   }
   if (
     containsBytes(
@@ -128,6 +173,17 @@ export function identifyAgentPokerBettingInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([209, 182, 226, 96, 55, 121, 83, 183]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerBettingInstruction.RefundBet;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
         new Uint8Array([186, 11, 231, 111, 242, 241, 203, 64]),
       ),
       0,
@@ -144,17 +200,29 @@ export type ParsedAgentPokerBettingInstruction<
   TProgram extends string = "HR2iEFkkt893fFtatyp3hivAzC8jznVpeoCAy5HBfQ4D",
 > =
   | ({
+      instructionType: AgentPokerBettingInstruction.CancelPool;
+    } & ParsedCancelPoolInstruction<TProgram>)
+  | ({
       instructionType: AgentPokerBettingInstruction.ClaimWinnings;
     } & ParsedClaimWinningsInstruction<TProgram>)
   | ({
+      instructionType: AgentPokerBettingInstruction.ClosePool;
+    } & ParsedClosePoolInstruction<TProgram>)
+  | ({
       instructionType: AgentPokerBettingInstruction.CreatePool;
     } & ParsedCreatePoolInstruction<TProgram>)
+  | ({
+      instructionType: AgentPokerBettingInstruction.FundTreasury;
+    } & ParsedFundTreasuryInstruction<TProgram>)
   | ({
       instructionType: AgentPokerBettingInstruction.LockPool;
     } & ParsedLockPoolInstruction<TProgram>)
   | ({
       instructionType: AgentPokerBettingInstruction.PlaceBet;
     } & ParsedPlaceBetInstruction<TProgram>)
+  | ({
+      instructionType: AgentPokerBettingInstruction.RefundBet;
+    } & ParsedRefundBetInstruction<TProgram>)
   | ({
       instructionType: AgentPokerBettingInstruction.SettlePool;
     } & ParsedSettlePoolInstruction<TProgram>);
@@ -164,6 +232,13 @@ export function parseAgentPokerBettingInstruction<TProgram extends string>(
 ): ParsedAgentPokerBettingInstruction<TProgram> {
   const instructionType = identifyAgentPokerBettingInstruction(instruction);
   switch (instructionType) {
+    case AgentPokerBettingInstruction.CancelPool: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerBettingInstruction.CancelPool,
+        ...parseCancelPoolInstruction(instruction),
+      };
+    }
     case AgentPokerBettingInstruction.ClaimWinnings: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -171,11 +246,25 @@ export function parseAgentPokerBettingInstruction<TProgram extends string>(
         ...parseClaimWinningsInstruction(instruction),
       };
     }
+    case AgentPokerBettingInstruction.ClosePool: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerBettingInstruction.ClosePool,
+        ...parseClosePoolInstruction(instruction),
+      };
+    }
     case AgentPokerBettingInstruction.CreatePool: {
       assertIsInstructionWithAccounts(instruction);
       return {
         instructionType: AgentPokerBettingInstruction.CreatePool,
         ...parseCreatePoolInstruction(instruction),
+      };
+    }
+    case AgentPokerBettingInstruction.FundTreasury: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerBettingInstruction.FundTreasury,
+        ...parseFundTreasuryInstruction(instruction),
       };
     }
     case AgentPokerBettingInstruction.LockPool: {
@@ -190,6 +279,13 @@ export function parseAgentPokerBettingInstruction<TProgram extends string>(
       return {
         instructionType: AgentPokerBettingInstruction.PlaceBet,
         ...parsePlaceBetInstruction(instruction),
+      };
+    }
+    case AgentPokerBettingInstruction.RefundBet: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerBettingInstruction.RefundBet,
+        ...parseRefundBetInstruction(instruction),
       };
     }
     case AgentPokerBettingInstruction.SettlePool: {

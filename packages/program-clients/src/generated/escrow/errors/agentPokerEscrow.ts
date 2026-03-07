@@ -14,52 +14,43 @@ import {
 } from "@solana/kit";
 import { AGENT_POKER_ESCROW_PROGRAM_ADDRESS } from "../programs";
 
-/** Unauthorized: Only the table authority can perform this action. */
+/** Unauthorized: Only the session authority can perform this action. */
 export const AGENT_POKER_ESCROW_ERROR__UNAUTHORIZED = 0x1770; // 6000
-/** InvalidWagerTier: Wager tier must be greater than zero. */
-export const AGENT_POKER_ESCROW_ERROR__INVALID_WAGER_TIER = 0x1771; // 6001
-/** TableNotOpen: Table is not open for new players. */
-export const AGENT_POKER_ESCROW_ERROR__TABLE_NOT_OPEN = 0x1772; // 6002
-/** TableFull: Table is already full. */
-export const AGENT_POKER_ESCROW_ERROR__TABLE_FULL = 0x1773; // 6003
-/** AlreadyJoined: Player has already joined this table. */
-export const AGENT_POKER_ESCROW_ERROR__ALREADY_JOINED = 0x1774; // 6004
-/** TableNotFull: Table must be full to start the game. */
-export const AGENT_POKER_ESCROW_ERROR__TABLE_NOT_FULL = 0x1775; // 6005
-/** GameNotInProgress: Game is not in progress. */
-export const AGENT_POKER_ESCROW_ERROR__GAME_NOT_IN_PROGRESS = 0x1776; // 6006
-/** InvalidWinnerIndex: Invalid winner index. */
-export const AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_INDEX = 0x1777; // 6007
-/** CannotRefund: Cannot refund a table that is in progress or already settled. */
-export const AGENT_POKER_ESCROW_ERROR__CANNOT_REFUND = 0x1778; // 6008
+/** InvalidDepositAmount: Deposit amount must be greater than zero. */
+export const AGENT_POKER_ESCROW_ERROR__INVALID_DEPOSIT_AMOUNT = 0x1771; // 6001
+/** SessionNotOpen: Session is not open for deposits. */
+export const AGENT_POKER_ESCROW_ERROR__SESSION_NOT_OPEN = 0x1772; // 6002
+/** SessionFull: Session is full (max deposits reached). */
+export const AGENT_POKER_ESCROW_ERROR__SESSION_FULL = 0x1773; // 6003
+/** AlreadyDeposited: Depositor has already deposited to this session. */
+export const AGENT_POKER_ESCROW_ERROR__ALREADY_DEPOSITED = 0x1774; // 6004
+/** SessionNotLocked: Session is not locked for settlement. */
+export const AGENT_POKER_ESCROW_ERROR__SESSION_NOT_LOCKED = 0x1775; // 6005
+/** NoDeposits: No deposits have been made. */
+export const AGENT_POKER_ESCROW_ERROR__NO_DEPOSITS = 0x1776; // 6006
+/** PayoutMismatch: Payout total does not match distributable amount (total - rake). */
+export const AGENT_POKER_ESCROW_ERROR__PAYOUT_MISMATCH = 0x1777; // 6007
+/** InvalidPayoutAccounts: Invalid payout accounts provided. */
+export const AGENT_POKER_ESCROW_ERROR__INVALID_PAYOUT_ACCOUNTS = 0x1778; // 6008
+/** CannotRefund: Cannot refund a session that is already settled or cancelled. */
+export const AGENT_POKER_ESCROW_ERROR__CANNOT_REFUND = 0x1779; // 6009
 /** ArithmeticOverflow: Arithmetic overflow. */
-export const AGENT_POKER_ESCROW_ERROR__ARITHMETIC_OVERFLOW = 0x1779; // 6009
-/** InsufficientVaultFunds: Insufficient funds in table vault. */
-export const AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_VAULT_FUNDS = 0x177a; // 6010
-/** InsufficientAgentFunds: Insufficient funds in agent vault. */
-export const AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_AGENT_FUNDS = 0x177b; // 6011
-/** InvalidAgentVault: Invalid agent vault PDA. */
-export const AGENT_POKER_ESCROW_ERROR__INVALID_AGENT_VAULT = 0x177c; // 6012
-/** InvalidWinnerVault: Invalid winner vault PDA. */
-export const AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_VAULT = 0x177d; // 6013
+export const AGENT_POKER_ESCROW_ERROR__ARITHMETIC_OVERFLOW = 0x177a; // 6010
 /** InvalidRefundAccounts: Invalid refund accounts provided. */
-export const AGENT_POKER_ESCROW_ERROR__INVALID_REFUND_ACCOUNTS = 0x177e; // 6014
+export const AGENT_POKER_ESCROW_ERROR__INVALID_REFUND_ACCOUNTS = 0x177b; // 6011
 
 export type AgentPokerEscrowError =
-  | typeof AGENT_POKER_ESCROW_ERROR__ALREADY_JOINED
+  | typeof AGENT_POKER_ESCROW_ERROR__ALREADY_DEPOSITED
   | typeof AGENT_POKER_ESCROW_ERROR__ARITHMETIC_OVERFLOW
   | typeof AGENT_POKER_ESCROW_ERROR__CANNOT_REFUND
-  | typeof AGENT_POKER_ESCROW_ERROR__GAME_NOT_IN_PROGRESS
-  | typeof AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_AGENT_FUNDS
-  | typeof AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_VAULT_FUNDS
-  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_AGENT_VAULT
+  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_DEPOSIT_AMOUNT
+  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_PAYOUT_ACCOUNTS
   | typeof AGENT_POKER_ESCROW_ERROR__INVALID_REFUND_ACCOUNTS
-  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_WAGER_TIER
-  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_INDEX
-  | typeof AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_VAULT
-  | typeof AGENT_POKER_ESCROW_ERROR__TABLE_FULL
-  | typeof AGENT_POKER_ESCROW_ERROR__TABLE_NOT_FULL
-  | typeof AGENT_POKER_ESCROW_ERROR__TABLE_NOT_OPEN
+  | typeof AGENT_POKER_ESCROW_ERROR__NO_DEPOSITS
+  | typeof AGENT_POKER_ESCROW_ERROR__PAYOUT_MISMATCH
+  | typeof AGENT_POKER_ESCROW_ERROR__SESSION_FULL
+  | typeof AGENT_POKER_ESCROW_ERROR__SESSION_NOT_LOCKED
+  | typeof AGENT_POKER_ESCROW_ERROR__SESSION_NOT_OPEN
   | typeof AGENT_POKER_ESCROW_ERROR__UNAUTHORIZED;
 
 let agentPokerEscrowErrorMessages:
@@ -67,21 +58,18 @@ let agentPokerEscrowErrorMessages:
   | undefined;
 if (process.env.NODE_ENV !== "production") {
   agentPokerEscrowErrorMessages = {
-    [AGENT_POKER_ESCROW_ERROR__ALREADY_JOINED]: `Player has already joined this table.`,
+    [AGENT_POKER_ESCROW_ERROR__ALREADY_DEPOSITED]: `Depositor has already deposited to this session.`,
     [AGENT_POKER_ESCROW_ERROR__ARITHMETIC_OVERFLOW]: `Arithmetic overflow.`,
-    [AGENT_POKER_ESCROW_ERROR__CANNOT_REFUND]: `Cannot refund a table that is in progress or already settled.`,
-    [AGENT_POKER_ESCROW_ERROR__GAME_NOT_IN_PROGRESS]: `Game is not in progress.`,
-    [AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_AGENT_FUNDS]: `Insufficient funds in agent vault.`,
-    [AGENT_POKER_ESCROW_ERROR__INSUFFICIENT_VAULT_FUNDS]: `Insufficient funds in table vault.`,
-    [AGENT_POKER_ESCROW_ERROR__INVALID_AGENT_VAULT]: `Invalid agent vault PDA.`,
+    [AGENT_POKER_ESCROW_ERROR__CANNOT_REFUND]: `Cannot refund a session that is already settled or cancelled.`,
+    [AGENT_POKER_ESCROW_ERROR__INVALID_DEPOSIT_AMOUNT]: `Deposit amount must be greater than zero.`,
+    [AGENT_POKER_ESCROW_ERROR__INVALID_PAYOUT_ACCOUNTS]: `Invalid payout accounts provided.`,
     [AGENT_POKER_ESCROW_ERROR__INVALID_REFUND_ACCOUNTS]: `Invalid refund accounts provided.`,
-    [AGENT_POKER_ESCROW_ERROR__INVALID_WAGER_TIER]: `Wager tier must be greater than zero.`,
-    [AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_INDEX]: `Invalid winner index.`,
-    [AGENT_POKER_ESCROW_ERROR__INVALID_WINNER_VAULT]: `Invalid winner vault PDA.`,
-    [AGENT_POKER_ESCROW_ERROR__TABLE_FULL]: `Table is already full.`,
-    [AGENT_POKER_ESCROW_ERROR__TABLE_NOT_FULL]: `Table must be full to start the game.`,
-    [AGENT_POKER_ESCROW_ERROR__TABLE_NOT_OPEN]: `Table is not open for new players.`,
-    [AGENT_POKER_ESCROW_ERROR__UNAUTHORIZED]: `Only the table authority can perform this action.`,
+    [AGENT_POKER_ESCROW_ERROR__NO_DEPOSITS]: `No deposits have been made.`,
+    [AGENT_POKER_ESCROW_ERROR__PAYOUT_MISMATCH]: `Payout total does not match distributable amount (total - rake).`,
+    [AGENT_POKER_ESCROW_ERROR__SESSION_FULL]: `Session is full (max deposits reached).`,
+    [AGENT_POKER_ESCROW_ERROR__SESSION_NOT_LOCKED]: `Session is not locked for settlement.`,
+    [AGENT_POKER_ESCROW_ERROR__SESSION_NOT_OPEN]: `Session is not open for deposits.`,
+    [AGENT_POKER_ESCROW_ERROR__UNAUTHORIZED]: `Only the session authority can perform this action.`,
   };
 }
 

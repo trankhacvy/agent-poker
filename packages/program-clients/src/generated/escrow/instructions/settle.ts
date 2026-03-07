@@ -10,51 +10,52 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
+  getArrayDecoder,
+  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
   type Address,
-  type FixedSizeCodec,
-  type FixedSizeDecoder,
-  type FixedSizeEncoder,
+  type Codec,
+  type Decoder,
+  type Encoder,
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
   type ReadonlyAccount,
+  type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
   type WritableAccount,
-  type WritableSignerAccount,
 } from "@solana/kit";
 import { AGENT_POKER_ESCROW_PROGRAM_ADDRESS } from "../programs";
+import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 import {
-  expectSome,
-  getAccountMetaFactory,
-  type ResolvedAccount,
-} from "../shared";
+  getPayoutDecoder,
+  getPayoutEncoder,
+  type Payout,
+  type PayoutArgs,
+} from "../types";
 
-export const CREATE_TABLE_DISCRIMINATOR = new Uint8Array([
-  214, 142, 131, 250, 242, 83, 135, 185,
+export const SETTLE_DISCRIMINATOR = new Uint8Array([
+  175, 42, 185, 87, 144, 131, 102, 212,
 ]);
 
-export function getCreateTableDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(
-    CREATE_TABLE_DISCRIMINATOR,
-  );
+export function getSettleDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(SETTLE_DISCRIMINATOR);
 }
 
-export type CreateTableInstruction<
+export type SettleInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountTable extends string | AccountMeta<string> = string,
-  TAccountTableVault extends string | AccountMeta<string> = string,
+  TAccountSession extends string | AccountMeta<string> = string,
+  TAccountSessionVault extends string | AccountMeta<string> = string,
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -63,15 +64,18 @@ export type CreateTableInstruction<
   InstructionWithAccounts<
     [
       TAccountAuthority extends string
-        ? WritableSignerAccount<TAccountAuthority> &
+        ? ReadonlySignerAccount<TAccountAuthority> &
             AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      TAccountTable extends string
-        ? WritableAccount<TAccountTable>
-        : TAccountTable,
-      TAccountTableVault extends string
-        ? WritableAccount<TAccountTableVault>
-        : TAccountTableVault,
+      TAccountSession extends string
+        ? WritableAccount<TAccountSession>
+        : TAccountSession,
+      TAccountSessionVault extends string
+        ? WritableAccount<TAccountSessionVault>
+        : TAccountSessionVault,
+      TAccountTreasury extends string
+        ? WritableAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -79,81 +83,78 @@ export type CreateTableInstruction<
     ]
   >;
 
-export type CreateTableInstructionData = {
+export type SettleInstructionData = {
   discriminator: ReadonlyUint8Array;
-  tableId: bigint;
-  wagerTier: bigint;
+  payouts: Array<Payout>;
 };
 
-export type CreateTableInstructionDataArgs = {
-  tableId: number | bigint;
-  wagerTier: number | bigint;
-};
+export type SettleInstructionDataArgs = { payouts: Array<PayoutArgs> };
 
-export function getCreateTableInstructionDataEncoder(): FixedSizeEncoder<CreateTableInstructionDataArgs> {
+export function getSettleInstructionDataEncoder(): Encoder<SettleInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["tableId", getU64Encoder()],
-      ["wagerTier", getU64Encoder()],
+      ["payouts", getArrayEncoder(getPayoutEncoder())],
     ]),
-    (value) => ({ ...value, discriminator: CREATE_TABLE_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: SETTLE_DISCRIMINATOR }),
   );
 }
 
-export function getCreateTableInstructionDataDecoder(): FixedSizeDecoder<CreateTableInstructionData> {
+export function getSettleInstructionDataDecoder(): Decoder<SettleInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["tableId", getU64Decoder()],
-    ["wagerTier", getU64Decoder()],
+    ["payouts", getArrayDecoder(getPayoutDecoder())],
   ]);
 }
 
-export function getCreateTableInstructionDataCodec(): FixedSizeCodec<
-  CreateTableInstructionDataArgs,
-  CreateTableInstructionData
+export function getSettleInstructionDataCodec(): Codec<
+  SettleInstructionDataArgs,
+  SettleInstructionData
 > {
   return combineCodec(
-    getCreateTableInstructionDataEncoder(),
-    getCreateTableInstructionDataDecoder(),
+    getSettleInstructionDataEncoder(),
+    getSettleInstructionDataDecoder(),
   );
 }
 
-export type CreateTableAsyncInput<
+export type SettleAsyncInput<
   TAccountAuthority extends string = string,
-  TAccountTable extends string = string,
-  TAccountTableVault extends string = string,
+  TAccountSession extends string = string,
+  TAccountSessionVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
-  table?: Address<TAccountTable>;
-  /** Validated by seeds constraint. */
-  tableVault?: Address<TAccountTableVault>;
+  session: Address<TAccountSession>;
+  sessionVault: Address<TAccountSessionVault>;
+  treasury?: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
-  tableId: CreateTableInstructionDataArgs["tableId"];
-  wagerTier: CreateTableInstructionDataArgs["wagerTier"];
+  payouts: SettleInstructionDataArgs["payouts"];
 };
 
-export async function getCreateTableInstructionAsync<
+export async function getSettleInstructionAsync<
   TAccountAuthority extends string,
-  TAccountTable extends string,
-  TAccountTableVault extends string,
+  TAccountSession extends string,
+  TAccountSessionVault extends string,
+  TAccountTreasury extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
 >(
-  input: CreateTableAsyncInput<
+  input: SettleAsyncInput<
     TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountSession,
+    TAccountSessionVault,
+    TAccountTreasury,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
-  CreateTableInstruction<
+  SettleInstruction<
     TProgramAddress,
     TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountSession,
+    TAccountSessionVault,
+    TAccountTreasury,
     TAccountSystemProgram
   >
 > {
@@ -163,9 +164,10 @@ export async function getCreateTableInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: true },
-    table: { value: input.table ?? null, isWritable: true },
-    tableVault: { value: input.tableVault ?? null, isWritable: true },
+    authority: { value: input.authority ?? null, isWritable: false },
+    session: { value: input.session ?? null, isWritable: true },
+    sessionVault: { value: input.sessionVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -177,23 +179,13 @@ export async function getCreateTableInstructionAsync<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.table.value) {
-    accounts.table.value = await getProgramDerivedAddress({
-      programAddress,
-      seeds: [
-        getBytesEncoder().encode(new Uint8Array([116, 97, 98, 108, 101])),
-        getU64Encoder().encode(expectSome(args.tableId)),
-      ],
-    });
-  }
-  if (!accounts.tableVault.value) {
-    accounts.tableVault.value = await getProgramDerivedAddress({
+  if (!accounts.treasury.value) {
+    accounts.treasury.value = await getProgramDerivedAddress({
       programAddress,
       seeds: [
         getBytesEncoder().encode(
-          new Uint8Array([116, 97, 98, 108, 101, 95, 118, 97, 117, 108, 116]),
+          new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121]),
         ),
-        getU64Encoder().encode(expectSome(args.tableId)),
       ],
     });
   }
@@ -206,57 +198,62 @@ export async function getCreateTableInstructionAsync<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.table),
-      getAccountMeta(accounts.tableVault),
+      getAccountMeta(accounts.session),
+      getAccountMeta(accounts.sessionVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getCreateTableInstructionDataEncoder().encode(
-      args as CreateTableInstructionDataArgs,
+    data: getSettleInstructionDataEncoder().encode(
+      args as SettleInstructionDataArgs,
     ),
     programAddress,
-  } as CreateTableInstruction<
+  } as SettleInstruction<
     TProgramAddress,
     TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountSession,
+    TAccountSessionVault,
+    TAccountTreasury,
     TAccountSystemProgram
   >);
 }
 
-export type CreateTableInput<
+export type SettleInput<
   TAccountAuthority extends string = string,
-  TAccountTable extends string = string,
-  TAccountTableVault extends string = string,
+  TAccountSession extends string = string,
+  TAccountSessionVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
-  table: Address<TAccountTable>;
-  /** Validated by seeds constraint. */
-  tableVault: Address<TAccountTableVault>;
+  session: Address<TAccountSession>;
+  sessionVault: Address<TAccountSessionVault>;
+  treasury: Address<TAccountTreasury>;
   systemProgram?: Address<TAccountSystemProgram>;
-  tableId: CreateTableInstructionDataArgs["tableId"];
-  wagerTier: CreateTableInstructionDataArgs["wagerTier"];
+  payouts: SettleInstructionDataArgs["payouts"];
 };
 
-export function getCreateTableInstruction<
+export function getSettleInstruction<
   TAccountAuthority extends string,
-  TAccountTable extends string,
-  TAccountTableVault extends string,
+  TAccountSession extends string,
+  TAccountSessionVault extends string,
+  TAccountTreasury extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
 >(
-  input: CreateTableInput<
+  input: SettleInput<
     TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountSession,
+    TAccountSessionVault,
+    TAccountTreasury,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): CreateTableInstruction<
+): SettleInstruction<
   TProgramAddress,
   TAccountAuthority,
-  TAccountTable,
-  TAccountTableVault,
+  TAccountSession,
+  TAccountSessionVault,
+  TAccountTreasury,
   TAccountSystemProgram
 > {
   // Program address.
@@ -265,9 +262,10 @@ export function getCreateTableInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    authority: { value: input.authority ?? null, isWritable: true },
-    table: { value: input.table ?? null, isWritable: true },
-    tableVault: { value: input.tableVault ?? null, isWritable: true },
+    authority: { value: input.authority ?? null, isWritable: false },
+    session: { value: input.session ?? null, isWritable: true },
+    sessionVault: { value: input.sessionVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -288,47 +286,49 @@ export function getCreateTableInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.table),
-      getAccountMeta(accounts.tableVault),
+      getAccountMeta(accounts.session),
+      getAccountMeta(accounts.sessionVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getCreateTableInstructionDataEncoder().encode(
-      args as CreateTableInstructionDataArgs,
+    data: getSettleInstructionDataEncoder().encode(
+      args as SettleInstructionDataArgs,
     ),
     programAddress,
-  } as CreateTableInstruction<
+  } as SettleInstruction<
     TProgramAddress,
     TAccountAuthority,
-    TAccountTable,
-    TAccountTableVault,
+    TAccountSession,
+    TAccountSessionVault,
+    TAccountTreasury,
     TAccountSystemProgram
   >);
 }
 
-export type ParsedCreateTableInstruction<
+export type ParsedSettleInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
     authority: TAccountMetas[0];
-    table: TAccountMetas[1];
-    /** Validated by seeds constraint. */
-    tableVault: TAccountMetas[2];
-    systemProgram: TAccountMetas[3];
+    session: TAccountMetas[1];
+    sessionVault: TAccountMetas[2];
+    treasury: TAccountMetas[3];
+    systemProgram: TAccountMetas[4];
   };
-  data: CreateTableInstructionData;
+  data: SettleInstructionData;
 };
 
-export function parseCreateTableInstruction<
+export function parseSettleInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedCreateTableInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 4) {
+): ParsedSettleInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 5) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -342,10 +342,11 @@ export function parseCreateTableInstruction<
     programAddress: instruction.programAddress,
     accounts: {
       authority: getNextAccount(),
-      table: getNextAccount(),
-      tableVault: getNextAccount(),
+      session: getNextAccount(),
+      sessionVault: getNextAccount(),
+      treasury: getNextAccount(),
       systemProgram: getNextAccount(),
     },
-    data: getCreateTableInstructionDataDecoder().decode(instruction.data),
+    data: getSettleInstructionDataDecoder().decode(instruction.data),
   };
 }

@@ -6,8 +6,12 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./cancelPool";
 export * from "./claimWinnings";
+export * from "./closePool";
 export * from "./createPool";
+export * from "./fundTreasury";
 export * from "./lockPool";
 export * from "./placeBet";
+export * from "./refundBet";
 export * from "./settlePool";

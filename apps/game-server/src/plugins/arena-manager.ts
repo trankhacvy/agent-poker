@@ -218,7 +218,17 @@ export class ArenaManager {
     }
 
     if (gameResult) {
-      const { winnerIndex, pot } = gameResult;
+      let { winnerIndex, pot } = gameResult;
+
+      // DEV: override winner for testing bet/payout flow
+      const forcedWinner = process.env.FORCE_WINNER_INDEX;
+      if (forcedWinner != null && forcedWinner !== "") {
+        const forced = parseInt(forcedWinner, 10);
+        if (forced >= 0 && forced < ARENA_AGENTS.length) {
+          this.log.warn({ original: winnerIndex, forced }, "FORCE_WINNER_INDEX override active");
+          winnerIndex = forced;
+        }
+      }
       this.gameTracker.decrement();
 
       // Update on-chain agent stats for all 6 players

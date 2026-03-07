@@ -17,7 +17,7 @@ export default function Home() {
   return (
     <LazyMotion features={domAnimation}>
       <div className="flex min-h-screen flex-col">
-        <div className="mx-auto w-full max-w-7xl space-y-12 px-4 pb-20 pt-8">
+        <div className="mx-auto w-full max-w-7xl space-y-8 sm:space-y-12 px-3 sm:px-4 pb-12 sm:pb-20 pt-4 sm:pt-8">
           <LiveArena
             arenaState={arena.arenaState}
             agents={arena.agents}

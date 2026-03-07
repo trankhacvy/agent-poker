@@ -13,16 +13,10 @@ interface PlayerSeatProps {
   showdownResult?: ShowdownResult;
   isWinner?: boolean;
   latestAction?: GameAction;
+  inline?: boolean;
 }
 
-const templateEmojis = [
-  "\u{1F988}",
-  "\u{1F525}",
-  "\u{1FAA8}",
-  "\u{1F98A}",
-  "\u{1F989}",
-  "\u{1F43A}",
-];
+// Avatar images are now in TEMPLATES
 
 // ── Seat Layouts ────────────────────────────────────────────────────────────
 // Each seat has a `seatType` that determines layout direction and card angle:
@@ -65,7 +59,7 @@ const SEAT_LAYOUTS: Record<number, SeatDef[]> = {
     { x: "97%", y: "65%", seatType: "right" },
   ],
   6: [
-    { x: "50%", y: "106%", seatType: "bottom" },
+    { x: "50%", y: "100%", seatType: "bottom" },
     { x: "2%", y: "75%", seatType: "left" },
     { x: "1%", y: "5%", seatType: "top-left" },
     { x: "50%", y: "-8%", seatType: "top" },
@@ -119,7 +113,7 @@ function ActionPopup({ action }: { action: GameAction }) {
   return (
     <div
       key={action.id}
-      className={`absolute -top-8 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap shadow-lg ${style}`}
+      className={`absolute -top-6 sm:-top-8 left-1/2 -translate-x-1/2 z-30 px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[8px] sm:text-[10px] font-bold whitespace-nowrap shadow-lg ${style}`}
       style={{ animation: "action-popup 2.5s ease-out forwards" }}
       onAnimationEnd={() => setVisible(false)}
     >
@@ -151,6 +145,7 @@ export default function PlayerSeat({
   showdownResult,
   isWinner = false,
   latestAction,
+  inline = false,
 }: PlayerSeatProps) {
   const template = TEMPLATES[player.templateId];
   const isFolded = player.status === "folded";
@@ -195,7 +190,7 @@ export default function PlayerSeat({
 
       {/* Avatar frame */}
       <div
-        className={`relative w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
+        className={`relative w-8 h-8 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-300 ${
           isFolded ? "opacity-40 grayscale" : ""
         }`}
         style={{
@@ -204,18 +199,22 @@ export default function PlayerSeat({
           ...avatarGlow,
         }}
       >
-        <span className="text-xl select-none">{templateEmojis[player.templateId]}</span>
+        <img
+          src={template?.avatar ?? "/icon.png"}
+          alt={player.displayName}
+          className="w-full h-full rounded-md sm:rounded-lg object-cover"
+        />
 
         {/* Winner crown - overlaid centered on top of avatar */}
         {isWinner && (
-          <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-base z-20 drop-shadow-[0_0_8px_rgba(252,163,17,0.8)]">
+          <div className="absolute -top-2.5 sm:-top-3 left-1/2 -translate-x-1/2 text-xs sm:text-base z-20 drop-shadow-[0_0_8px_rgba(252,163,17,0.8)]">
             {"\u{1F451}"}
           </div>
         )}
 
         {/* Dealer badge */}
         {player.isDealer && (
-          <div className="absolute -right-1.5 -top-1.5 w-5 h-5 rounded-full bg-white text-[#161d26] text-[8px] font-bold flex items-center justify-center shadow-md z-10">
+          <div className="absolute -right-1 -top-1 sm:-right-1.5 sm:-top-1.5 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-white text-[#161d26] text-[6px] sm:text-[8px] font-bold flex items-center justify-center shadow-md z-10">
             D
           </div>
         )}
@@ -223,7 +222,7 @@ export default function PlayerSeat({
         {/* ALL IN badge */}
         {isAllIn && (
           <div
-            className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold text-red-300 bg-red-500/30 border border-red-500/40 whitespace-nowrap z-10"
+            className="absolute -bottom-1 sm:-bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-0.5 rounded-full text-[5px] sm:text-[7px] font-bold text-red-300 bg-red-500/30 border border-red-500/40 whitespace-nowrap z-10"
             style={{ animation: "allin-pulse 2s infinite" }}
           >
             ALL IN
@@ -232,7 +231,7 @@ export default function PlayerSeat({
 
         {/* FOLD badge */}
         {isFolded && (
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full text-[7px] font-bold text-zinc-400 bg-zinc-600/60 border border-zinc-500/30 whitespace-nowrap z-10">
+          <div className="absolute -bottom-1 sm:-bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 sm:px-2 py-0.5 rounded-full text-[5px] sm:text-[7px] font-bold text-zinc-400 bg-zinc-600/60 border border-zinc-500/30 whitespace-nowrap z-10">
             FOLD
           </div>
         )}
@@ -244,7 +243,7 @@ export default function PlayerSeat({
     <div className="flex flex-col items-center gap-0.5">
       {/* Name pill */}
       <div
-        className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 backdrop-blur-sm border ${
+        className={`flex items-center gap-1 sm:gap-1.5 rounded-full px-1.5 sm:px-2.5 py-0.5 backdrop-blur-sm border ${
           isWinner
             ? "bg-[#fca311]/15 border-[#fca311]/40"
             : isCurrentTurn
@@ -255,14 +254,16 @@ export default function PlayerSeat({
         }`}
       >
         {isWinner ? (
-          <span className="text-[8px] font-black text-[#fca311] tracking-wider">WIN</span>
+          <span className="text-[6px] sm:text-[8px] font-black text-[#fca311] tracking-wider">
+            WIN
+          </span>
         ) : (
-          <span className="text-[9px] font-bold text-white/25 tabular-nums">
+          <span className="text-[7px] sm:text-[9px] font-bold text-white/25 tabular-nums">
             {player.seatIndex + 1}
           </span>
         )}
         <span
-          className={`text-[11px] font-bold truncate max-w-[72px] ${
+          className={`text-[8px] sm:text-[11px] font-bold truncate max-w-[48px] sm:max-w-[72px] ${
             isWinner ? "text-[#fca311]" : isFolded ? "text-zinc-500" : "text-white/80"
           }`}
         >
@@ -270,10 +271,10 @@ export default function PlayerSeat({
         </span>
       </div>
       {/* Balance */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-0.5 sm:gap-1">
         <SolIcon className={isWinner ? "text-[#fca311]" : "text-purple-400"} />
         <span
-          className={`text-[11px] font-bold tabular-nums ${
+          className={`text-[9px] sm:text-[11px] font-bold tabular-nums ${
             isWinner ? "text-[#fca311]" : "text-white/60"
           }`}
         >
@@ -301,7 +302,7 @@ export default function PlayerSeat({
 
   const handNameBlock = showdownResult && !isFolded && (
     <div
-      className={`rounded-full px-2 py-0.5 text-[8px] font-bold ${
+      className={`rounded-full px-1.5 sm:px-2 py-0.5 text-[6px] sm:text-[8px] font-bold ${
         showdownResult.isWinner ? "bg-[#fca311]/20 text-[#fca311]" : "bg-white/5 text-zinc-400"
       }`}
     >
@@ -310,11 +311,13 @@ export default function PlayerSeat({
   );
 
   const betBlock = player.currentBet > 0 && !isFolded && (
-    <div className="flex items-center gap-1">
-      <div className="w-3.5 h-3.5 rounded-full bg-[#fca311] border-2 border-[#1a1f2e] flex items-center justify-center shadow">
-        <span className="text-[5px] font-bold text-[#161d26]">$</span>
+    <div className="flex items-center gap-0.5 sm:gap-1">
+      <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-[#fca311] border-2 border-[#1a1f2e] flex items-center justify-center shadow">
+        <span className="text-[4px] sm:text-[5px] font-bold text-[#161d26]">$</span>
       </div>
-      <span className="text-[10px] font-medium text-[#fca311]">{player.currentBet}</span>
+      <span className="text-[8px] sm:text-[10px] font-medium text-[#fca311]">
+        {player.currentBet}
+      </span>
     </div>
   );
 
@@ -334,6 +337,20 @@ export default function PlayerSeat({
   ) : (
     cardsBlock
   );
+
+  if (inline) {
+    return (
+      <div className="flex flex-col items-center gap-1">
+        {avatarBlock}
+        {infoBlock}
+        <div className="flex flex-col items-center gap-0.5">
+          {cardsBlock}
+          {handNameBlock}
+          {betBlock}
+        </div>
+      </div>
+    );
+  }
 
   if (isHorizontal) {
     const playerColumn = (

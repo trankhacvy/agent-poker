@@ -5,25 +5,26 @@
 
 @theme {
   /* ── Neutral Scale ── */
-  --color-neutral-50:  #FFFFFF;
-  --color-neutral-100: #CAC6DD;
-  --color-neutral-200: #ADA8C3;
+  --color-neutral-50: #ffffff;
+  --color-neutral-100: #cac6dd;
+  --color-neutral-200: #ada8c3;
   --color-neutral-300: #757185;
-  --color-neutral-400: #3F3A52;
+  --color-neutral-400: #3f3a52;
   --color-neutral-500: #252134;
-  --color-neutral-600: #15131D;
-  --color-neutral-700: #0E0C15;
+  --color-neutral-600: #15131d;
+  --color-neutral-700: #0e0c15;
 
   /* ── Accent Colors ── */
-  --color-violet: #AC6AFF;
-  --color-gold:   #FFC876;
-  --color-coral:  #FF776F;
-  --color-green:  #7ADB78;
-  --color-pink:   #FF98E2;
-  --color-cyan:   #79FFF7;
+  /* --color-violet: #AC6AFF; */
+  --color-violet: #ff776f;
+  --color-gold: #ffc876;
+  --color-coral: #ff776f;
+  --color-green: #7adb78;
+  --color-pink: #ff98e2;
+  --color-cyan: #79fff7;
 
   /* ── Stroke / Border ── */
-  --color-stroke: #26242C;
+  --color-stroke: #26242c;
 
   /* ── Semantic aliases ── */
   --color-background: var(--color-neutral-700);
@@ -65,7 +66,7 @@
 }
 
 * {
-  @apply border-border;
+  /* @apply border-border; */
 }
 
 body {
@@ -83,14 +84,7 @@ body {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: conic-gradient(
-    from 225deg,
-    #ffc876,
-    #79fff7,
-    #9f53ff,
-    #ff98e2,
-    #ffc876
-  );
+  background: conic-gradient(from 225deg, #ffc876, #79fff7, #9f53ff, #ff98e2, #ffc876);
   mask:
     linear-gradient(#fff 0 0) content-box,
     linear-gradient(#fff 0 0);

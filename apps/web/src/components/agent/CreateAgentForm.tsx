@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useAccount } from "@solana/connector";
 import { TEMPLATES } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const templateEmojis = ["🦈", "🔥", "🪨", "🦊"];
-
 export default function CreateAgentForm() {
-  const { connected } = useWallet();
+  const { connected } = useAccount();
   const [selectedTemplate, setSelectedTemplate] = useState(0);
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
@@ -46,7 +44,7 @@ export default function CreateAgentForm() {
                 }`}
                 onClick={() => setSelectedTemplate(template.id)}
               >
-                <span className="text-3xl">{templateEmojis[template.id]}</span>
+                <img src={template.avatar} alt={template.name} className="w-10 h-10 rounded-lg object-cover" />
                 <span className="text-sm font-semibold" style={{ color: template.color }}>
                   {template.name}
                 </span>

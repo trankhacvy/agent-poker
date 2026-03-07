@@ -18,7 +18,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const templateEmojis = ["\u{1F988}", "\u{1F525}", "\u{1FAA8}", "\u{1F98A}"];
 
 interface AgentProfilePageProps {
   params: Promise<{ pubkey: string }>;
@@ -116,10 +115,10 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
           <Card className="mb-8">
             <CardContent className="flex flex-col gap-6 p-6 sm:flex-row sm:items-center">
               <div
-                className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full text-4xl"
+                className="h-20 w-20 shrink-0 rounded-full overflow-hidden"
                 style={{ backgroundColor: `${template.color}20` }}
               >
-                {templateEmojis[agent.templateId]}
+                <img src={template.avatar} alt={template.name} className="w-full h-full object-cover" />
               </div>
               <div className="flex-1">
                 <h1 className="text-2xl font-bold text-foreground">{agent.displayName}</h1>
@@ -197,7 +196,7 @@ export default function AgentProfilePage({ params }: AgentProfilePageProps) {
                 <div>
                   <div className="text-xs text-muted-foreground">Template</div>
                   <div className="flex items-center gap-2">
-                    <span>{templateEmojis[agent.templateId]}</span>
+                    <img src={template.avatar} alt={template.name} className="w-6 h-6 rounded-md object-cover" />
                     <span className="font-medium" style={{ color: template.color }}>
                       {template.name}
                     </span>

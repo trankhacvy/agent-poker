@@ -6,9 +6,9 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./createTable";
+export * from "./createSession";
+export * from "./deposit";
 export * from "./initializeTreasury";
-export * from "./joinTable";
-export * from "./refundTable";
-export * from "./settleTable";
-export * from "./startGame";
+export * from "./lockSession";
+export * from "./refundSession";
+export * from "./settle";

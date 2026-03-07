@@ -16,8 +16,6 @@ import {
   getProgramDerivedAddress,
   getStructDecoder,
   getStructEncoder,
-  getU64Decoder,
-  getU64Encoder,
   transformEncoder,
   type AccountMeta,
   type AccountSignerMeta,
@@ -55,7 +53,7 @@ export type ClaimWinningsInstruction<
   TProgram extends string = typeof AGENT_POKER_BETTING_PROGRAM_ADDRESS,
   TAccountBettor extends string | AccountMeta<string> = string,
   TAccountPool extends string | AccountMeta<string> = string,
-  TAccountPoolVault extends string | AccountMeta<string> = string,
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountBet extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -71,9 +69,9 @@ export type ClaimWinningsInstruction<
       TAccountPool extends string
         ? ReadonlyAccount<TAccountPool>
         : TAccountPool,
-      TAccountPoolVault extends string
-        ? WritableAccount<TAccountPoolVault>
-        : TAccountPoolVault,
+      TAccountTreasury extends string
+        ? WritableAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountBet extends string ? WritableAccount<TAccountBet> : TAccountBet,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -84,19 +82,13 @@ export type ClaimWinningsInstruction<
 
 export type ClaimWinningsInstructionData = {
   discriminator: ReadonlyUint8Array;
-  winningPoolTotal: bigint;
 };
 
-export type ClaimWinningsInstructionDataArgs = {
-  winningPoolTotal: number | bigint;
-};
+export type ClaimWinningsInstructionDataArgs = {};
 
 export function getClaimWinningsInstructionDataEncoder(): FixedSizeEncoder<ClaimWinningsInstructionDataArgs> {
   return transformEncoder(
-    getStructEncoder([
-      ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
-      ["winningPoolTotal", getU64Encoder()],
-    ]),
+    getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
     (value) => ({ ...value, discriminator: CLAIM_WINNINGS_DISCRIMINATOR }),
   );
 }
@@ -104,7 +96,6 @@ export function getClaimWinningsInstructionDataEncoder(): FixedSizeEncoder<Claim
 export function getClaimWinningsInstructionDataDecoder(): FixedSizeDecoder<ClaimWinningsInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
-    ["winningPoolTotal", getU64Decoder()],
   ]);
 }
 
@@ -121,22 +112,21 @@ export function getClaimWinningsInstructionDataCodec(): FixedSizeCodec<
 export type ClaimWinningsAsyncInput<
   TAccountBettor extends string = string,
   TAccountPool extends string = string,
-  TAccountPoolVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountBet extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   bettor: TransactionSigner<TAccountBettor>;
   pool: Address<TAccountPool>;
-  poolVault?: Address<TAccountPoolVault>;
+  treasury?: Address<TAccountTreasury>;
   bet?: Address<TAccountBet>;
   systemProgram?: Address<TAccountSystemProgram>;
-  winningPoolTotal: ClaimWinningsInstructionDataArgs["winningPoolTotal"];
 };
 
 export async function getClaimWinningsInstructionAsync<
   TAccountBettor extends string,
   TAccountPool extends string,
-  TAccountPoolVault extends string,
+  TAccountTreasury extends string,
   TAccountBet extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_BETTING_PROGRAM_ADDRESS,
@@ -144,7 +134,7 @@ export async function getClaimWinningsInstructionAsync<
   input: ClaimWinningsAsyncInput<
     TAccountBettor,
     TAccountPool,
-    TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >,
@@ -154,7 +144,7 @@ export async function getClaimWinningsInstructionAsync<
     TProgramAddress,
     TAccountBettor,
     TAccountPool,
-    TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >
@@ -167,7 +157,7 @@ export async function getClaimWinningsInstructionAsync<
   const originalAccounts = {
     bettor: { value: input.bettor ?? null, isWritable: true },
     pool: { value: input.pool ?? null, isWritable: false },
-    poolVault: { value: input.poolVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     bet: { value: input.bet ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -176,18 +166,14 @@ export async function getClaimWinningsInstructionAsync<
     ResolvedAccount
   >;
 
-  // Original args.
-  const args = { ...input };
-
   // Resolve default values.
-  if (!accounts.poolVault.value) {
-    accounts.poolVault.value = await getProgramDerivedAddress({
+  if (!accounts.treasury.value) {
+    accounts.treasury.value = await getProgramDerivedAddress({
       programAddress,
       seeds: [
         getBytesEncoder().encode(
-          new Uint8Array([112, 111, 111, 108, 95, 118, 97, 117, 108, 116]),
+          new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121]),
         ),
-        getAddressEncoder().encode(expectAddress(accounts.pool.value)),
       ],
     });
   }
@@ -211,19 +197,17 @@ export async function getClaimWinningsInstructionAsync<
     accounts: [
       getAccountMeta(accounts.bettor),
       getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.poolVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.bet),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getClaimWinningsInstructionDataEncoder().encode(
-      args as ClaimWinningsInstructionDataArgs,
-    ),
+    data: getClaimWinningsInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimWinningsInstruction<
     TProgramAddress,
     TAccountBettor,
     TAccountPool,
-    TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >);
@@ -232,22 +216,21 @@ export async function getClaimWinningsInstructionAsync<
 export type ClaimWinningsInput<
   TAccountBettor extends string = string,
   TAccountPool extends string = string,
-  TAccountPoolVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountBet extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   bettor: TransactionSigner<TAccountBettor>;
   pool: Address<TAccountPool>;
-  poolVault: Address<TAccountPoolVault>;
+  treasury: Address<TAccountTreasury>;
   bet: Address<TAccountBet>;
   systemProgram?: Address<TAccountSystemProgram>;
-  winningPoolTotal: ClaimWinningsInstructionDataArgs["winningPoolTotal"];
 };
 
 export function getClaimWinningsInstruction<
   TAccountBettor extends string,
   TAccountPool extends string,
-  TAccountPoolVault extends string,
+  TAccountTreasury extends string,
   TAccountBet extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_BETTING_PROGRAM_ADDRESS,
@@ -255,7 +238,7 @@ export function getClaimWinningsInstruction<
   input: ClaimWinningsInput<
     TAccountBettor,
     TAccountPool,
-    TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >,
@@ -264,7 +247,7 @@ export function getClaimWinningsInstruction<
   TProgramAddress,
   TAccountBettor,
   TAccountPool,
-  TAccountPoolVault,
+  TAccountTreasury,
   TAccountBet,
   TAccountSystemProgram
 > {
@@ -276,7 +259,7 @@ export function getClaimWinningsInstruction<
   const originalAccounts = {
     bettor: { value: input.bettor ?? null, isWritable: true },
     pool: { value: input.pool ?? null, isWritable: false },
-    poolVault: { value: input.poolVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: true },
     bet: { value: input.bet ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -284,9 +267,6 @@ export function getClaimWinningsInstruction<
     keyof typeof originalAccounts,
     ResolvedAccount
   >;
-
-  // Original args.
-  const args = { ...input };
 
   // Resolve default values.
   if (!accounts.systemProgram.value) {
@@ -299,19 +279,17 @@ export function getClaimWinningsInstruction<
     accounts: [
       getAccountMeta(accounts.bettor),
       getAccountMeta(accounts.pool),
-      getAccountMeta(accounts.poolVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.bet),
       getAccountMeta(accounts.systemProgram),
     ],
-    data: getClaimWinningsInstructionDataEncoder().encode(
-      args as ClaimWinningsInstructionDataArgs,
-    ),
+    data: getClaimWinningsInstructionDataEncoder().encode({}),
     programAddress,
   } as ClaimWinningsInstruction<
     TProgramAddress,
     TAccountBettor,
     TAccountPool,
-    TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >);
@@ -325,7 +303,7 @@ export type ParsedClaimWinningsInstruction<
   accounts: {
     bettor: TAccountMetas[0];
     pool: TAccountMetas[1];
-    poolVault: TAccountMetas[2];
+    treasury: TAccountMetas[2];
     bet: TAccountMetas[3];
     systemProgram: TAccountMetas[4];
   };
@@ -355,7 +333,7 @@ export function parseClaimWinningsInstruction<
     accounts: {
       bettor: getNextAccount(),
       pool: getNextAccount(),
-      poolVault: getNextAccount(),
+      treasury: getNextAccount(),
       bet: getNextAccount(),
       systemProgram: getNextAccount(),
     },

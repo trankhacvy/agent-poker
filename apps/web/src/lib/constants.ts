@@ -19,10 +19,10 @@ export const WAGER_TIERS = [
 ] as const;
 
 export const TEMPLATES = [
-  { id: 0, name: "Shark", description: "Tight and aggressive. Plays few hands but bets big.", color: "#3B82F6" },
-  { id: 1, name: "Maniac", description: "Loose and wild. Plays many hands, bluffs often.", color: "#EF4444" },
-  { id: 2, name: "Rock", description: "Ultra-conservative. Only plays premium hands.", color: "#6B7280" },
-  { id: 3, name: "Fox", description: "Adaptive and tricky. Changes strategy based on opponents.", color: "#F59E0B" },
-  { id: 4, name: "Owl", description: "Analytical precision. Plays by the numbers.", color: "#8B5CF6" },
-  { id: 5, name: "Wolf", description: "Relentless aggression in position.", color: "#10B981" },
+  { id: 0, name: "Shark", description: "Tight and aggressive. Plays few hands but bets big.", color: "#3B82F6", avatar: "/shark.png" },
+  { id: 1, name: "Maniac", description: "Loose and wild. Plays many hands, bluffs often.", color: "#EF4444", avatar: "/maniac.png" },
+  { id: 2, name: "Rock", description: "Ultra-conservative. Only plays premium hands.", color: "#6B7280", avatar: "/rock.png" },
+  { id: 3, name: "Fox", description: "Adaptive and tricky. Changes strategy based on opponents.", color: "#F59E0B", avatar: "/fox.png" },
+  { id: 4, name: "Owl", description: "Analytical precision. Plays by the numbers.", color: "#8B5CF6", avatar: "/owl.png" },
+  { id: 5, name: "Wolf", description: "Relentless aggression in position.", color: "#10B981", avatar: "/wolf.png" },
 ] as const;

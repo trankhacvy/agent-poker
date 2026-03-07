@@ -32,18 +32,20 @@ import {
 import { AGENT_POKER_ESCROW_PROGRAM_ADDRESS } from "../programs";
 import { getAccountMetaFactory, type ResolvedAccount } from "../shared";
 
-export const START_GAME_DISCRIMINATOR = new Uint8Array([
-  249, 47, 252, 172, 184, 162, 245, 14,
+export const LOCK_SESSION_DISCRIMINATOR = new Uint8Array([
+  63, 245, 60, 30, 109, 12, 58, 5,
 ]);
 
-export function getStartGameDiscriminatorBytes() {
-  return fixEncoderSize(getBytesEncoder(), 8).encode(START_GAME_DISCRIMINATOR);
+export function getLockSessionDiscriminatorBytes() {
+  return fixEncoderSize(getBytesEncoder(), 8).encode(
+    LOCK_SESSION_DISCRIMINATOR,
+  );
 }
 
-export type StartGameInstruction<
+export type LockSessionInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
   TAccountAuthority extends string | AccountMeta<string> = string,
-  TAccountTable extends string | AccountMeta<string> = string,
+  TAccountSession extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -53,56 +55,56 @@ export type StartGameInstruction<
         ? ReadonlySignerAccount<TAccountAuthority> &
             AccountSignerMeta<TAccountAuthority>
         : TAccountAuthority,
-      TAccountTable extends string
-        ? WritableAccount<TAccountTable>
-        : TAccountTable,
+      TAccountSession extends string
+        ? WritableAccount<TAccountSession>
+        : TAccountSession,
       ...TRemainingAccounts,
     ]
   >;
 
-export type StartGameInstructionData = { discriminator: ReadonlyUint8Array };
+export type LockSessionInstructionData = { discriminator: ReadonlyUint8Array };
 
-export type StartGameInstructionDataArgs = {};
+export type LockSessionInstructionDataArgs = {};
 
-export function getStartGameInstructionDataEncoder(): FixedSizeEncoder<StartGameInstructionDataArgs> {
+export function getLockSessionInstructionDataEncoder(): FixedSizeEncoder<LockSessionInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: START_GAME_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: LOCK_SESSION_DISCRIMINATOR }),
   );
 }
 
-export function getStartGameInstructionDataDecoder(): FixedSizeDecoder<StartGameInstructionData> {
+export function getLockSessionInstructionDataDecoder(): FixedSizeDecoder<LockSessionInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
-export function getStartGameInstructionDataCodec(): FixedSizeCodec<
-  StartGameInstructionDataArgs,
-  StartGameInstructionData
+export function getLockSessionInstructionDataCodec(): FixedSizeCodec<
+  LockSessionInstructionDataArgs,
+  LockSessionInstructionData
 > {
   return combineCodec(
-    getStartGameInstructionDataEncoder(),
-    getStartGameInstructionDataDecoder(),
+    getLockSessionInstructionDataEncoder(),
+    getLockSessionInstructionDataDecoder(),
   );
 }
 
-export type StartGameInput<
+export type LockSessionInput<
   TAccountAuthority extends string = string,
-  TAccountTable extends string = string,
+  TAccountSession extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
-  table: Address<TAccountTable>;
+  session: Address<TAccountSession>;
 };
 
-export function getStartGameInstruction<
+export function getLockSessionInstruction<
   TAccountAuthority extends string,
-  TAccountTable extends string,
+  TAccountSession extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
 >(
-  input: StartGameInput<TAccountAuthority, TAccountTable>,
+  input: LockSessionInput<TAccountAuthority, TAccountSession>,
   config?: { programAddress?: TProgramAddress },
-): StartGameInstruction<TProgramAddress, TAccountAuthority, TAccountTable> {
+): LockSessionInstruction<TProgramAddress, TAccountAuthority, TAccountSession> {
   // Program address.
   const programAddress =
     config?.programAddress ?? AGENT_POKER_ESCROW_PROGRAM_ADDRESS;
@@ -110,7 +112,7 @@ export function getStartGameInstruction<
   // Original accounts.
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: false },
-    table: { value: input.table ?? null, isWritable: true },
+    session: { value: input.session ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -121,33 +123,37 @@ export function getStartGameInstruction<
   return Object.freeze({
     accounts: [
       getAccountMeta(accounts.authority),
-      getAccountMeta(accounts.table),
+      getAccountMeta(accounts.session),
     ],
-    data: getStartGameInstructionDataEncoder().encode({}),
+    data: getLockSessionInstructionDataEncoder().encode({}),
     programAddress,
-  } as StartGameInstruction<TProgramAddress, TAccountAuthority, TAccountTable>);
+  } as LockSessionInstruction<
+    TProgramAddress,
+    TAccountAuthority,
+    TAccountSession
+  >);
 }
 
-export type ParsedStartGameInstruction<
+export type ParsedLockSessionInstruction<
   TProgram extends string = typeof AGENT_POKER_ESCROW_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
     authority: TAccountMetas[0];
-    table: TAccountMetas[1];
+    session: TAccountMetas[1];
   };
-  data: StartGameInstructionData;
+  data: LockSessionInstructionData;
 };
 
-export function parseStartGameInstruction<
+export function parseLockSessionInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedStartGameInstruction<TProgram, TAccountMetas> {
+): ParsedLockSessionInstruction<TProgram, TAccountMetas> {
   if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
@@ -160,7 +166,7 @@ export function parseStartGameInstruction<
   };
   return {
     programAddress: instruction.programAddress,
-    accounts: { authority: getNextAccount(), table: getNextAccount() },
-    data: getStartGameInstructionDataDecoder().decode(instruction.data),
+    accounts: { authority: getNextAccount(), session: getNextAccount() },
+    data: getLockSessionInstructionDataDecoder().decode(instruction.data),
   };
 }

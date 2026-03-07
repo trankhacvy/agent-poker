@@ -17,25 +17,25 @@ import {
   type ReadonlyUint8Array,
 } from "@solana/kit";
 import {
-  parseCreateTableInstruction,
+  parseCreateSessionInstruction,
+  parseDepositInstruction,
   parseInitializeTreasuryInstruction,
-  parseJoinTableInstruction,
-  parseRefundTableInstruction,
-  parseSettleTableInstruction,
-  parseStartGameInstruction,
-  type ParsedCreateTableInstruction,
+  parseLockSessionInstruction,
+  parseRefundSessionInstruction,
+  parseSettleInstruction,
+  type ParsedCreateSessionInstruction,
+  type ParsedDepositInstruction,
   type ParsedInitializeTreasuryInstruction,
-  type ParsedJoinTableInstruction,
-  type ParsedRefundTableInstruction,
-  type ParsedSettleTableInstruction,
-  type ParsedStartGameInstruction,
+  type ParsedLockSessionInstruction,
+  type ParsedRefundSessionInstruction,
+  type ParsedSettleInstruction,
 } from "../instructions";
 
 export const AGENT_POKER_ESCROW_PROGRAM_ADDRESS =
-  "6xJviS1Mz3rArD3JciQ55u7K1xDqtYr1AGvSeWvW1dti" as Address<"6xJviS1Mz3rArD3JciQ55u7K1xDqtYr1AGvSeWvW1dti">;
+  "Ed684BPr262EGicZGayjLNB8ujMYct771bc8LMBV5CUf" as Address<"Ed684BPr262EGicZGayjLNB8ujMYct771bc8LMBV5CUf">;
 
 export enum AgentPokerEscrowAccount {
-  TableEscrow,
+  Session,
   Treasury,
 }
 
@@ -47,12 +47,12 @@ export function identifyAgentPokerEscrowAccount(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([200, 120, 2, 103, 194, 160, 7, 29]),
+        new Uint8Array([243, 81, 72, 115, 214, 188, 72, 144]),
       ),
       0,
     )
   ) {
-    return AgentPokerEscrowAccount.TableEscrow;
+    return AgentPokerEscrowAccount.Session;
   }
   if (
     containsBytes(
@@ -71,12 +71,12 @@ export function identifyAgentPokerEscrowAccount(
 }
 
 export enum AgentPokerEscrowInstruction {
-  CreateTable,
+  CreateSession,
+  Deposit,
   InitializeTreasury,
-  JoinTable,
-  RefundTable,
-  SettleTable,
-  StartGame,
+  LockSession,
+  RefundSession,
+  Settle,
 }
 
 export function identifyAgentPokerEscrowInstruction(
@@ -87,12 +87,23 @@ export function identifyAgentPokerEscrowInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([214, 142, 131, 250, 242, 83, 135, 185]),
+        new Uint8Array([242, 193, 143, 179, 150, 25, 122, 227]),
       ),
       0,
     )
   ) {
-    return AgentPokerEscrowInstruction.CreateTable;
+    return AgentPokerEscrowInstruction.CreateSession;
+  }
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([242, 35, 198, 137, 82, 225, 242, 182]),
+      ),
+      0,
+    )
+  ) {
+    return AgentPokerEscrowInstruction.Deposit;
   }
   if (
     containsBytes(
@@ -109,45 +120,34 @@ export function identifyAgentPokerEscrowInstruction(
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([14, 117, 84, 51, 95, 146, 171, 70]),
+        new Uint8Array([63, 245, 60, 30, 109, 12, 58, 5]),
       ),
       0,
     )
   ) {
-    return AgentPokerEscrowInstruction.JoinTable;
+    return AgentPokerEscrowInstruction.LockSession;
   }
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([139, 63, 78, 205, 150, 151, 137, 230]),
+        new Uint8Array([168, 87, 185, 45, 250, 170, 10, 85]),
       ),
       0,
     )
   ) {
-    return AgentPokerEscrowInstruction.RefundTable;
+    return AgentPokerEscrowInstruction.RefundSession;
   }
   if (
     containsBytes(
       data,
       fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([137, 147, 185, 185, 80, 61, 145, 115]),
+        new Uint8Array([175, 42, 185, 87, 144, 131, 102, 212]),
       ),
       0,
     )
   ) {
-    return AgentPokerEscrowInstruction.SettleTable;
-  }
-  if (
-    containsBytes(
-      data,
-      fixEncoderSize(getBytesEncoder(), 8).encode(
-        new Uint8Array([249, 47, 252, 172, 184, 162, 245, 14]),
-      ),
-      0,
-    )
-  ) {
-    return AgentPokerEscrowInstruction.StartGame;
+    return AgentPokerEscrowInstruction.Settle;
   }
   throw new Error(
     "The provided instruction could not be identified as a agentPokerEscrow instruction.",
@@ -155,37 +155,44 @@ export function identifyAgentPokerEscrowInstruction(
 }
 
 export type ParsedAgentPokerEscrowInstruction<
-  TProgram extends string = "6xJviS1Mz3rArD3JciQ55u7K1xDqtYr1AGvSeWvW1dti",
+  TProgram extends string = "Ed684BPr262EGicZGayjLNB8ujMYct771bc8LMBV5CUf",
 > =
   | ({
-      instructionType: AgentPokerEscrowInstruction.CreateTable;
-    } & ParsedCreateTableInstruction<TProgram>)
+      instructionType: AgentPokerEscrowInstruction.CreateSession;
+    } & ParsedCreateSessionInstruction<TProgram>)
+  | ({
+      instructionType: AgentPokerEscrowInstruction.Deposit;
+    } & ParsedDepositInstruction<TProgram>)
   | ({
       instructionType: AgentPokerEscrowInstruction.InitializeTreasury;
     } & ParsedInitializeTreasuryInstruction<TProgram>)
   | ({
-      instructionType: AgentPokerEscrowInstruction.JoinTable;
-    } & ParsedJoinTableInstruction<TProgram>)
+      instructionType: AgentPokerEscrowInstruction.LockSession;
+    } & ParsedLockSessionInstruction<TProgram>)
   | ({
-      instructionType: AgentPokerEscrowInstruction.RefundTable;
-    } & ParsedRefundTableInstruction<TProgram>)
+      instructionType: AgentPokerEscrowInstruction.RefundSession;
+    } & ParsedRefundSessionInstruction<TProgram>)
   | ({
-      instructionType: AgentPokerEscrowInstruction.SettleTable;
-    } & ParsedSettleTableInstruction<TProgram>)
-  | ({
-      instructionType: AgentPokerEscrowInstruction.StartGame;
-    } & ParsedStartGameInstruction<TProgram>);
+      instructionType: AgentPokerEscrowInstruction.Settle;
+    } & ParsedSettleInstruction<TProgram>);
 
 export function parseAgentPokerEscrowInstruction<TProgram extends string>(
   instruction: Instruction<TProgram> & InstructionWithData<ReadonlyUint8Array>,
 ): ParsedAgentPokerEscrowInstruction<TProgram> {
   const instructionType = identifyAgentPokerEscrowInstruction(instruction);
   switch (instructionType) {
-    case AgentPokerEscrowInstruction.CreateTable: {
+    case AgentPokerEscrowInstruction.CreateSession: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: AgentPokerEscrowInstruction.CreateTable,
-        ...parseCreateTableInstruction(instruction),
+        instructionType: AgentPokerEscrowInstruction.CreateSession,
+        ...parseCreateSessionInstruction(instruction),
+      };
+    }
+    case AgentPokerEscrowInstruction.Deposit: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: AgentPokerEscrowInstruction.Deposit,
+        ...parseDepositInstruction(instruction),
       };
     }
     case AgentPokerEscrowInstruction.InitializeTreasury: {
@@ -195,32 +202,25 @@ export function parseAgentPokerEscrowInstruction<TProgram extends string>(
         ...parseInitializeTreasuryInstruction(instruction),
       };
     }
-    case AgentPokerEscrowInstruction.JoinTable: {
+    case AgentPokerEscrowInstruction.LockSession: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: AgentPokerEscrowInstruction.JoinTable,
-        ...parseJoinTableInstruction(instruction),
+        instructionType: AgentPokerEscrowInstruction.LockSession,
+        ...parseLockSessionInstruction(instruction),
       };
     }
-    case AgentPokerEscrowInstruction.RefundTable: {
+    case AgentPokerEscrowInstruction.RefundSession: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: AgentPokerEscrowInstruction.RefundTable,
-        ...parseRefundTableInstruction(instruction),
+        instructionType: AgentPokerEscrowInstruction.RefundSession,
+        ...parseRefundSessionInstruction(instruction),
       };
     }
-    case AgentPokerEscrowInstruction.SettleTable: {
+    case AgentPokerEscrowInstruction.Settle: {
       assertIsInstructionWithAccounts(instruction);
       return {
-        instructionType: AgentPokerEscrowInstruction.SettleTable,
-        ...parseSettleTableInstruction(instruction),
-      };
-    }
-    case AgentPokerEscrowInstruction.StartGame: {
-      assertIsInstructionWithAccounts(instruction);
-      return {
-        instructionType: AgentPokerEscrowInstruction.StartGame,
-        ...parseStartGameInstruction(instruction),
+        instructionType: AgentPokerEscrowInstruction.Settle,
+        ...parseSettleInstruction(instruction),
       };
     }
     default:

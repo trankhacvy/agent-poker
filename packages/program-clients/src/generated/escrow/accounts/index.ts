@@ -6,5 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./tableEscrow";
+export * from "./session";
 export * from "./treasury";

@@ -10,10 +10,6 @@ import {
   combineCodec,
   fixDecoderSize,
   fixEncoderSize,
-  getAddressDecoder,
-  getAddressEncoder,
-  getArrayDecoder,
-  getArrayEncoder,
   getBytesDecoder,
   getBytesEncoder,
   getProgramDerivedAddress,
@@ -25,9 +21,9 @@ import {
   type AccountMeta,
   type AccountSignerMeta,
   type Address,
-  type Codec,
-  type Decoder,
-  type Encoder,
+  type FixedSizeCodec,
+  type FixedSizeDecoder,
+  type FixedSizeEncoder,
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
@@ -58,12 +54,6 @@ export type CreateGameTestInstruction<
   TProgram extends string = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -78,24 +68,6 @@ export type CreateGameTestInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountHand0 extends string
-        ? WritableAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? WritableAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? WritableAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? WritableAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? WritableAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? WritableAccount<TAccountHand5>
-        : TAccountHand5,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -107,41 +79,37 @@ export type CreateGameTestInstructionData = {
   discriminator: ReadonlyUint8Array;
   gameId: bigint;
   tableId: bigint;
-  players: Array<Address>;
   wagerTier: bigint;
 };
 
 export type CreateGameTestInstructionDataArgs = {
   gameId: number | bigint;
   tableId: number | bigint;
-  players: Array<Address>;
   wagerTier: number | bigint;
 };
 
-export function getCreateGameTestInstructionDataEncoder(): Encoder<CreateGameTestInstructionDataArgs> {
+export function getCreateGameTestInstructionDataEncoder(): FixedSizeEncoder<CreateGameTestInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["gameId", getU64Encoder()],
       ["tableId", getU64Encoder()],
-      ["players", getArrayEncoder(getAddressEncoder())],
       ["wagerTier", getU64Encoder()],
     ]),
     (value) => ({ ...value, discriminator: CREATE_GAME_TEST_DISCRIMINATOR }),
   );
 }
 
-export function getCreateGameTestInstructionDataDecoder(): Decoder<CreateGameTestInstructionData> {
+export function getCreateGameTestInstructionDataDecoder(): FixedSizeDecoder<CreateGameTestInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["gameId", getU64Decoder()],
     ["tableId", getU64Decoder()],
-    ["players", getArrayDecoder(getAddressDecoder())],
     ["wagerTier", getU64Decoder()],
   ]);
 }
 
-export function getCreateGameTestInstructionDataCodec(): Codec<
+export function getCreateGameTestInstructionDataCodec(): FixedSizeCodec<
   CreateGameTestInstructionDataArgs,
   CreateGameTestInstructionData
 > {
@@ -154,50 +122,25 @@ export function getCreateGameTestInstructionDataCodec(): Codec<
 export type CreateGameTestAsyncInput<
   TAccountAuthority extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
   game?: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameTestInstructionDataArgs["gameId"];
   tableId: CreateGameTestInstructionDataArgs["tableId"];
-  players: CreateGameTestInstructionDataArgs["players"];
   wagerTier: CreateGameTestInstructionDataArgs["wagerTier"];
 };
 
 export async function getCreateGameTestInstructionAsync<
   TAccountAuthority extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: CreateGameTestAsyncInput<
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -206,12 +149,6 @@ export async function getCreateGameTestInstructionAsync<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountSystemProgram
   >
 > {
@@ -223,12 +160,6 @@ export async function getCreateGameTestInstructionAsync<
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -261,12 +192,6 @@ export async function getCreateGameTestInstructionAsync<
     accounts: [
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameTestInstructionDataEncoder().encode(
@@ -277,12 +202,6 @@ export async function getCreateGameTestInstructionAsync<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountSystemProgram
   >);
 }
@@ -290,50 +209,25 @@ export async function getCreateGameTestInstructionAsync<
 export type CreateGameTestInput<
   TAccountAuthority extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
   game: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameTestInstructionDataArgs["gameId"];
   tableId: CreateGameTestInstructionDataArgs["tableId"];
-  players: CreateGameTestInstructionDataArgs["players"];
   wagerTier: CreateGameTestInstructionDataArgs["wagerTier"];
 };
 
 export function getCreateGameTestInstruction<
   TAccountAuthority extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: CreateGameTestInput<
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -341,12 +235,6 @@ export function getCreateGameTestInstruction<
   TProgramAddress,
   TAccountAuthority,
   TAccountGame,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5,
   TAccountSystemProgram
 > {
   // Program address.
@@ -357,12 +245,6 @@ export function getCreateGameTestInstruction<
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -384,12 +266,6 @@ export function getCreateGameTestInstruction<
     accounts: [
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameTestInstructionDataEncoder().encode(
@@ -400,12 +276,6 @@ export function getCreateGameTestInstruction<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountSystemProgram
   >);
 }
@@ -418,13 +288,7 @@ export type ParsedCreateGameTestInstruction<
   accounts: {
     authority: TAccountMetas[0];
     game: TAccountMetas[1];
-    hand0: TAccountMetas[2];
-    hand1: TAccountMetas[3];
-    hand2: TAccountMetas[4];
-    hand3: TAccountMetas[5];
-    hand4: TAccountMetas[6];
-    hand5: TAccountMetas[7];
-    systemProgram: TAccountMetas[8];
+    systemProgram: TAccountMetas[2];
   };
   data: CreateGameTestInstructionData;
 };
@@ -437,7 +301,7 @@ export function parseCreateGameTestInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateGameTestInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 9) {
+  if (instruction.accounts.length < 3) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -452,12 +316,6 @@ export function parseCreateGameTestInstruction<
     accounts: {
       authority: getNextAccount(),
       game: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getCreateGameTestInstructionDataDecoder().decode(instruction.data),

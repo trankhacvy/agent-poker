@@ -75,12 +75,12 @@ export default function StatsSection({ stats }: StatsSectionProps) {
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.2 }}
-      className="grid grid-cols-1 gap-6 md:grid-cols-3"
+      className="grid grid-cols-1 gap-3 sm:gap-6 md:grid-cols-3"
     >
       {stats.map((stat) => (
         <div
           key={stat.label}
-          className="relative rounded-2xl bg-neutral-600 border border-neutral-50/10 p-6 overflow-hidden"
+          className="relative rounded-xl sm:rounded-2xl bg-neutral-600 border border-neutral-50/10 p-4 sm:p-6 overflow-hidden"
         >
           {/* Subtle gradient accent */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-violet/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />

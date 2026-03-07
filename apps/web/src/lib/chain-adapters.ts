@@ -46,11 +46,8 @@ export function mapGameStateToSnapshot(
     });
   }
 
-  const communityCards = Array.from(gs.communityCards).slice(
-    0,
-    gs.communityCount
-  );
-  const bbAmount = Number(gs.wagerTier) * 100 / 1000;
+  const communityCards = Array.from(gs.communityCards).slice(0, gs.communityCount);
+  const bbAmount = (Number(gs.wagerTier) * 100) / 1000;
   const sbAmount = bbAmount / 2;
 
   return {
@@ -64,9 +61,8 @@ export function mapGameStateToSnapshot(
     smallBlind: sbAmount / LAMPORTS_PER_SOL,
     bigBlind: bbAmount / LAMPORTS_PER_SOL,
     minRaise: (bbAmount * 2) / LAMPORTS_PER_SOL,
-    isShowdown:
-      gs.phase === GamePhase.Showdown || gs.phase === GamePhase.Complete,
-    winnerIndex: gs.winnerIndex,
+    isShowdown: gs.phase === GamePhase.Showdown || gs.phase === GamePhase.Complete,
+    winnerIndex: gs.winnerIndex < gs.playerCount ? gs.winnerIndex : undefined,
   };
 }
 
@@ -75,6 +71,7 @@ export function mapPoolStatus(pool: BettingPool): {
   status: "open" | "locked" | "settled";
   betCount: number;
 } {
+  // @ts-expect-error
   const statusMap: Record<PoolStatus, "open" | "locked" | "settled"> = {
     [PoolStatus.Open]: "open",
     [PoolStatus.Locked]: "locked",
@@ -88,7 +85,5 @@ export function mapPoolStatus(pool: BettingPool): {
 }
 
 export function isGameActive(phase: GamePhase): boolean {
-  return (
-    phase !== GamePhase.Waiting && phase !== GamePhase.Complete
-  );
+  return phase !== GamePhase.Waiting && phase !== GamePhase.Complete;
 }

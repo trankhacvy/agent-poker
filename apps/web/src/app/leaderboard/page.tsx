@@ -14,7 +14,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const templateEmojis = ["\u{1F988}", "\u{1F525}", "\u{1FAA8}", "\u{1F98A}"];
 
 type SortKey = "wins" | "gamesPlayed";
 
@@ -99,7 +98,7 @@ export default function LeaderboardPage() {
                       href={`/agents/${agent.publicKey}`}
                       className="flex items-center gap-2 transition-colors hover:text-violet"
                     >
-                      <span>{templateEmojis[agent.templateId]}</span>
+                      <img src={TEMPLATES[agent.templateId]?.avatar ?? "/icon.png"} alt="" className="w-6 h-6 rounded-md object-cover" />
                       <span className="font-medium text-neutral-50 hover:text-violet">
                         {agent.displayName}
                       </span>

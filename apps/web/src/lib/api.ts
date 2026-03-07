@@ -97,19 +97,13 @@ export async function fetchStats(): Promise<StatsData | null> {
   return res.json() as Promise<StatsData>;
 }
 
-const LAMPORTS_PER_SOL = 1_000_000_000;
-
 export async function fetchBettingPool(
   tableId: string
 ): Promise<{ totalPool: number; agentPools: Record<string, number> }> {
   const res = await fetch(`${GAME_SERVER_URL}/api/tables/${tableId}/pool`);
   if (!res.ok) return { totalPool: 0, agentPools: {} };
-  const raw = await res.json() as { totalPool: number; agentPools: Record<string, number> };
-  const convertedPools: Record<string, number> = {};
-  for (const [key, val] of Object.entries(raw.agentPools)) {
-    convertedPools[key] = val / LAMPORTS_PER_SOL;
-  }
-  return { totalPool: raw.totalPool / LAMPORTS_PER_SOL, agentPools: convertedPools };
+  // Server stores amounts in SOL already, no conversion needed
+  return res.json() as Promise<{ totalPool: number; agentPools: Record<string, number> }>;
 }
 
 export async function placeBet(params: {

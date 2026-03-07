@@ -19,6 +19,7 @@ export enum PoolStatus {
   Open,
   Locked,
   Settled,
+  Cancelled,
 }
 
 export type PoolStatusArgs = PoolStatus;

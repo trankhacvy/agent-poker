@@ -11,13 +11,15 @@ import BettingPanel from "@/components/betting/BettingPanel";
 import ArenaAgentCard from "@/components/arena/ArenaAgentCard";
 import type { GameAction } from "@/lib/types";
 import type { ArenaAgentConfig, ArenaState } from "@/lib/arena-types";
+import type { UserBet } from "@/lib/types";
 import { useBettingProgram } from "@/hooks/useBettingProgram";
 import { useGameStateSubscription } from "@/hooks/useGameStateSubscription";
 import { usePlayerHandsSubscription } from "@/hooks/usePlayerHandsSubscription";
 import { useBettingPoolSubscription } from "@/hooks/useBettingPoolSubscription";
 import { useArenaAgentStats } from "@/hooks/useArenaAgentStats";
+import { TEMPLATES } from "@/lib/constants";
 import { deriveGamePda, derivePoolPda } from "@/lib/pda";
-import { mapGameStateToSnapshot, mapPoolStatus } from "@/lib/chain-adapters";
+import { mapGameStateToSnapshot } from "@/lib/chain-adapters";
 import type { AgentActionEvent } from "@/hooks/useArenaLifecycle";
 import type { Address } from "@solana/kit";
 
@@ -49,7 +51,8 @@ export default function LiveArena({
   gateFailedReason,
 }: LiveArenaProps) {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null);
-  const { placeBetOnChain } = useBettingProgram();
+  const [userBet, setUserBet] = useState<UserBet | null>(null);
+  const { placeBetOnChain, claimWinnings } = useBettingProgram();
 
   const LAMPORTS_PER_SOL = 1_000_000_000;
 
@@ -93,12 +96,21 @@ export default function LiveArena({
     return mapGameStateToSnapshot(onChainGameState, holeCards, agentNameMap);
   }, [onChainGameState, holeCards, agentNameMap]);
 
-  // ── Pool data from chain ──
+  // ── Pool data: chain total + local per-agent tracking ──
+  const [localAgentPools, setLocalAgentPools] = useState<Record<string, number>>({});
+
+  // Reset local tracking when round changes
+  useEffect(() => {
+    setLocalAgentPools({});
+    setUserBet(null);
+  }, [tableId]);
+
   const poolData = useMemo(() => {
-    if (!onChainPool) return { totalPool: 0, agentPools: {} as Record<string, number> };
-    const mapped = mapPoolStatus(onChainPool);
-    return { totalPool: mapped.totalPool, agentPools: {} as Record<string, number> };
-  }, [onChainPool]);
+    const totalPool = onChainPool
+      ? Number(onChainPool.totalPool) / LAMPORTS_PER_SOL
+      : 0;
+    return { totalPool, agentPools: localAgentPools };
+  }, [onChainPool, localAgentPools]);
 
   // ── Convert agent actions to GameAction[] for ActionFeed ──
   const actions: GameAction[] = useMemo(
@@ -125,24 +137,43 @@ export default function LiveArena({
 
       const lamports = Math.round(params.amount * LAMPORTS_PER_SOL);
 
-      // Send on-chain place_bet transaction (user signs) — that's it!
-      // The BettingPool subscription will update the pool display automatically.
       const txSignature = await placeBetOnChain(tableId, agentIndex, lamports);
       if (!txSignature) throw new Error("On-chain transaction failed");
+
+      // Track per-agent bet locally (on-chain pool only stores total)
+      setLocalAgentPools((prev) => ({
+        ...prev,
+        [params.agentPubkey]: (prev[params.agentPubkey] ?? 0) + params.amount,
+      }));
 
       return { success: true };
     },
     [tableId, agents, placeBetOnChain]
   );
 
+  const handleClaimWinnings = useCallback(
+    async () => {
+      if (!tableId) throw new Error("No table to claim from");
+      const sig = await claimWinnings(tableId);
+      if (!sig) throw new Error("Claim transaction failed");
+      return sig;
+    },
+    [tableId, claimWinnings]
+  );
+
+  const resolvedWinnerIndex =
+    gameState?.winnerIndex != null
+      ? gameState.winnerIndex
+      : lastWinner?.index ?? null;
+
   const winnerName =
-    gameEnded && gameState?.winnerIndex != null
-      ? gameState.players[gameState.winnerIndex]?.displayName
+    gameEnded && resolvedWinnerIndex != null
+      ? gameState?.players[resolvedWinnerIndex]?.displayName ?? lastWinner?.name ?? null
       : (lastWinner?.name ?? null);
 
   const winnerPublicKey =
-    gameEnded && gameState?.winnerIndex != null
-      ? gameState.players[gameState.winnerIndex]?.publicKey
+    gameEnded && resolvedWinnerIndex != null
+      ? gameState?.players[resolvedWinnerIndex]?.publicKey
       : undefined;
 
   return (
@@ -150,7 +181,7 @@ export default function LiveArena({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="grid grid-cols-1 gap-6 lg:grid-cols-12"
+      className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-12"
     >
       {/* --- Main Area (Left) --- */}
       <div className="flex flex-col gap-4 lg:col-span-8">
@@ -195,7 +226,7 @@ export default function LiveArena({
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
               {agentsWithStats.map((agent) => (
                 <ArenaAgentCard
                   key={agent.pubkey}
@@ -270,15 +301,23 @@ export default function LiveArena({
               )}
               <p className="text-sm text-neutral-200">Next round starting soon...</p>
               {/* Agent virtual balances */}
-              <div className="grid grid-cols-3 gap-2 px-8 pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2 px-3 sm:px-8 pt-2">
                 {agentsWithStats.map((agent) => (
                   <div
                     key={agent.pubkey}
-                    className="flex items-center gap-2 rounded-lg bg-neutral-500/50 px-3 py-1.5 text-xs"
+                    className="flex items-center gap-1.5 sm:gap-2 rounded-lg bg-neutral-500/50 px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs"
                   >
-                    <div className="size-3 rounded-full" style={{ backgroundColor: agent.color }} />
-                    <span className="font-medium text-neutral-50">{agent.displayName}</span>
-                    <span className="ml-auto text-neutral-200">{agent.virtualBalance ?? 100} pts</span>
+                    <img
+                      src={TEMPLATES[agent.template]?.avatar ?? "/icon.png"}
+                      alt={agent.displayName}
+                      className="size-4 sm:size-5 rounded-full object-cover shrink-0"
+                    />
+                    <span className="font-medium text-neutral-50 truncate">
+                      {agent.displayName}
+                    </span>
+                    <span className="ml-auto text-neutral-200 shrink-0">
+                      {agent.virtualBalance ?? 100}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -317,10 +356,13 @@ export default function LiveArena({
             bettingCountdown={bettingCountdown}
             bettingLocked={arenaState === "playing"}
             onPlaceBet={handlePlaceBet}
+            onClaimWinnings={handleClaimWinnings}
+            userBet={userBet}
+            onUserBetChange={setUserBet}
           />
-        ) : arenaState === "betting" ? (
+        ) : arenaState === "betting" || arenaState === "playing" ? (
           <BettingPanel
-            tableId={`arena-${roundNumber}`}
+            tableId={tableId ?? `arena-${roundNumber}`}
             players={agentsWithStats.map((a, i) => ({
               seatIndex: i,
               publicKey: a.pubkey,
@@ -336,8 +378,11 @@ export default function LiveArena({
             agentPools={poolData.agentPools}
             gamePhase="playing"
             bettingCountdown={bettingCountdown}
-            bettingLocked={false}
+            bettingLocked={arenaState === "playing"}
             onPlaceBet={handlePlaceBet}
+            onClaimWinnings={handleClaimWinnings}
+            userBet={userBet}
+            onUserBetChange={setUserBet}
           />
         ) : (
           <Card className="flex h-full flex-col overflow-hidden p-0">

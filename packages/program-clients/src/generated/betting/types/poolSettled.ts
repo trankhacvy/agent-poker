@@ -26,14 +26,12 @@ export type PoolSettled = {
   pool: Address;
   winnerIndex: number;
   totalPool: bigint;
-  rake: bigint;
 };
 
 export type PoolSettledArgs = {
   pool: Address;
   winnerIndex: number;
   totalPool: number | bigint;
-  rake: number | bigint;
 };
 
 export function getPoolSettledEncoder(): FixedSizeEncoder<PoolSettledArgs> {
@@ -41,7 +39,6 @@ export function getPoolSettledEncoder(): FixedSizeEncoder<PoolSettledArgs> {
     ["pool", getAddressEncoder()],
     ["winnerIndex", getU8Encoder()],
     ["totalPool", getU64Encoder()],
-    ["rake", getU64Encoder()],
   ]);
 }
 
@@ -50,7 +47,6 @@ export function getPoolSettledDecoder(): FixedSizeDecoder<PoolSettled> {
     ["pool", getAddressDecoder()],
     ["winnerIndex", getU8Decoder()],
     ["totalPool", getU64Decoder()],
-    ["rake", getU64Decoder()],
   ]);
 }
 

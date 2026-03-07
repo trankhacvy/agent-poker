@@ -45,18 +45,6 @@ export type ShowdownInstruction<
   TProgram extends string = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
   TAccountPayer extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand0 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand1 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand2 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand3 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand4 extends string | AccountMeta<string> = string,
-  TAccountPermissionHand5 extends string | AccountMeta<string> = string,
   TAccountPermissionProgram extends string | AccountMeta<string> =
     "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
   TAccountMagicProgram extends string | AccountMeta<string> =
@@ -75,42 +63,6 @@ export type ShowdownInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountHand0 extends string
-        ? WritableAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? WritableAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? WritableAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? WritableAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? WritableAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? WritableAccount<TAccountHand5>
-        : TAccountHand5,
-      TAccountPermissionHand0 extends string
-        ? WritableAccount<TAccountPermissionHand0>
-        : TAccountPermissionHand0,
-      TAccountPermissionHand1 extends string
-        ? WritableAccount<TAccountPermissionHand1>
-        : TAccountPermissionHand1,
-      TAccountPermissionHand2 extends string
-        ? WritableAccount<TAccountPermissionHand2>
-        : TAccountPermissionHand2,
-      TAccountPermissionHand3 extends string
-        ? WritableAccount<TAccountPermissionHand3>
-        : TAccountPermissionHand3,
-      TAccountPermissionHand4 extends string
-        ? WritableAccount<TAccountPermissionHand4>
-        : TAccountPermissionHand4,
-      TAccountPermissionHand5 extends string
-        ? WritableAccount<TAccountPermissionHand5>
-        : TAccountPermissionHand5,
       TAccountPermissionProgram extends string
         ? ReadonlyAccount<TAccountPermissionProgram>
         : TAccountPermissionProgram,
@@ -154,36 +106,12 @@ export function getShowdownInstructionDataCodec(): FixedSizeCodec<
 export type ShowdownInput<
   TAccountPayer extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
-  TAccountPermissionHand0 extends string = string,
-  TAccountPermissionHand1 extends string = string,
-  TAccountPermissionHand2 extends string = string,
-  TAccountPermissionHand3 extends string = string,
-  TAccountPermissionHand4 extends string = string,
-  TAccountPermissionHand5 extends string = string,
   TAccountPermissionProgram extends string = string,
   TAccountMagicProgram extends string = string,
   TAccountMagicContext extends string = string,
 > = {
   payer: TransactionSigner<TAccountPayer>;
   game: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
-  permissionHand0: Address<TAccountPermissionHand0>;
-  permissionHand1: Address<TAccountPermissionHand1>;
-  permissionHand2: Address<TAccountPermissionHand2>;
-  permissionHand3: Address<TAccountPermissionHand3>;
-  permissionHand4: Address<TAccountPermissionHand4>;
-  permissionHand5: Address<TAccountPermissionHand5>;
   permissionProgram?: Address<TAccountPermissionProgram>;
   magicProgram?: Address<TAccountMagicProgram>;
   magicContext?: Address<TAccountMagicContext>;
@@ -192,18 +120,6 @@ export type ShowdownInput<
 export function getShowdownInstruction<
   TAccountPayer extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
-  TAccountPermissionHand0 extends string,
-  TAccountPermissionHand1 extends string,
-  TAccountPermissionHand2 extends string,
-  TAccountPermissionHand3 extends string,
-  TAccountPermissionHand4 extends string,
-  TAccountPermissionHand5 extends string,
   TAccountPermissionProgram extends string,
   TAccountMagicProgram extends string,
   TAccountMagicContext extends string,
@@ -212,18 +128,6 @@ export function getShowdownInstruction<
   input: ShowdownInput<
     TAccountPayer,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
-    TAccountPermissionHand0,
-    TAccountPermissionHand1,
-    TAccountPermissionHand2,
-    TAccountPermissionHand3,
-    TAccountPermissionHand4,
-    TAccountPermissionHand5,
     TAccountPermissionProgram,
     TAccountMagicProgram,
     TAccountMagicContext
@@ -233,18 +137,6 @@ export function getShowdownInstruction<
   TProgramAddress,
   TAccountPayer,
   TAccountGame,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5,
-  TAccountPermissionHand0,
-  TAccountPermissionHand1,
-  TAccountPermissionHand2,
-  TAccountPermissionHand3,
-  TAccountPermissionHand4,
-  TAccountPermissionHand5,
   TAccountPermissionProgram,
   TAccountMagicProgram,
   TAccountMagicContext
@@ -257,18 +149,6 @@ export function getShowdownInstruction<
   const originalAccounts = {
     payer: { value: input.payer ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
-    permissionHand0: { value: input.permissionHand0 ?? null, isWritable: true },
-    permissionHand1: { value: input.permissionHand1 ?? null, isWritable: true },
-    permissionHand2: { value: input.permissionHand2 ?? null, isWritable: true },
-    permissionHand3: { value: input.permissionHand3 ?? null, isWritable: true },
-    permissionHand4: { value: input.permissionHand4 ?? null, isWritable: true },
-    permissionHand5: { value: input.permissionHand5 ?? null, isWritable: true },
     permissionProgram: {
       value: input.permissionProgram ?? null,
       isWritable: false,
@@ -300,18 +180,6 @@ export function getShowdownInstruction<
     accounts: [
       getAccountMeta(accounts.payer),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
-      getAccountMeta(accounts.permissionHand0),
-      getAccountMeta(accounts.permissionHand1),
-      getAccountMeta(accounts.permissionHand2),
-      getAccountMeta(accounts.permissionHand3),
-      getAccountMeta(accounts.permissionHand4),
-      getAccountMeta(accounts.permissionHand5),
       getAccountMeta(accounts.permissionProgram),
       getAccountMeta(accounts.magicProgram),
       getAccountMeta(accounts.magicContext),
@@ -322,18 +190,6 @@ export function getShowdownInstruction<
     TProgramAddress,
     TAccountPayer,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
-    TAccountPermissionHand0,
-    TAccountPermissionHand1,
-    TAccountPermissionHand2,
-    TAccountPermissionHand3,
-    TAccountPermissionHand4,
-    TAccountPermissionHand5,
     TAccountPermissionProgram,
     TAccountMagicProgram,
     TAccountMagicContext
@@ -348,21 +204,9 @@ export type ParsedShowdownInstruction<
   accounts: {
     payer: TAccountMetas[0];
     game: TAccountMetas[1];
-    hand0: TAccountMetas[2];
-    hand1: TAccountMetas[3];
-    hand2: TAccountMetas[4];
-    hand3: TAccountMetas[5];
-    hand4: TAccountMetas[6];
-    hand5: TAccountMetas[7];
-    permissionHand0: TAccountMetas[8];
-    permissionHand1: TAccountMetas[9];
-    permissionHand2: TAccountMetas[10];
-    permissionHand3: TAccountMetas[11];
-    permissionHand4: TAccountMetas[12];
-    permissionHand5: TAccountMetas[13];
-    permissionProgram: TAccountMetas[14];
-    magicProgram: TAccountMetas[15];
-    magicContext: TAccountMetas[16];
+    permissionProgram: TAccountMetas[2];
+    magicProgram: TAccountMetas[3];
+    magicContext: TAccountMetas[4];
   };
   data: ShowdownInstructionData;
 };
@@ -375,7 +219,7 @@ export function parseShowdownInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedShowdownInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 17) {
+  if (instruction.accounts.length < 5) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -390,18 +234,6 @@ export function parseShowdownInstruction<
     accounts: {
       payer: getNextAccount(),
       game: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
-      permissionHand0: getNextAccount(),
-      permissionHand1: getNextAccount(),
-      permissionHand2: getNextAccount(),
-      permissionHand3: getNextAccount(),
-      permissionHand4: getNextAccount(),
-      permissionHand5: getNextAccount(),
       permissionProgram: getNextAccount(),
       magicProgram: getNextAccount(),
       magicContext: getNextAccount(),

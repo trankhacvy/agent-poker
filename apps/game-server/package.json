@@ -22,7 +22,7 @@
     "@openrouter/ai-sdk-provider": "^2.2.3",
     "@repo/program-clients": "workspace:*",
     "@sinclair/typebox": "^0.34.0",
-    "@solana/kit": "^2.1.0",
+    "@solana/kit": "^5.0.0",
     "@solana/web3.js": "^1.95.0",
     "ai": "^6.0.101",
     "bs58": "^6.0.0",

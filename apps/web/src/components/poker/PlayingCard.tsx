@@ -39,21 +39,21 @@ interface CardProps {
 }
 
 const sizes = {
-  sm: "w-9 h-[52px]",
-  md: "w-12 h-[68px]",
-  lg: "w-[60px] h-[84px]",
+  sm: "w-7 h-10 sm:w-9 sm:h-[52px]",
+  md: "w-9 h-[52px] sm:w-12 sm:h-[68px]",
+  lg: "w-9 h-[52px] sm:w-[60px] sm:h-[84px]",
 };
 
 const rankSizes = {
-  sm: "text-sm",
-  md: "text-lg",
-  lg: "text-2xl",
+  sm: "text-xs sm:text-sm",
+  md: "text-sm sm:text-lg",
+  lg: "text-sm sm:text-2xl",
 };
 
 const cornerSizes = {
-  sm: "text-[7px]",
-  md: "text-[9px]",
-  lg: "text-xs",
+  sm: "text-[5px] sm:text-[7px]",
+  md: "text-[6px] sm:text-[9px]",
+  lg: "text-[7px] sm:text-xs",
 };
 
 export default function PlayingCard({

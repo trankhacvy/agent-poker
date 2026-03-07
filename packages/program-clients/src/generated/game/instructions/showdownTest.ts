@@ -24,7 +24,6 @@ import {
   type Instruction,
   type InstructionWithAccounts,
   type InstructionWithData,
-  type ReadonlyAccount,
   type ReadonlySignerAccount,
   type ReadonlyUint8Array,
   type TransactionSigner,
@@ -47,12 +46,6 @@ export type ShowdownTestInstruction<
   TProgram extends string = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -65,24 +58,6 @@ export type ShowdownTestInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountHand0 extends string
-        ? ReadonlyAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? ReadonlyAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? ReadonlyAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? ReadonlyAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? ReadonlyAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? ReadonlyAccount<TAccountHand5>
-        : TAccountHand5,
       ...TRemainingAccounts,
     ]
   >;
@@ -117,56 +92,19 @@ export function getShowdownTestInstructionDataCodec(): FixedSizeCodec<
 export type ShowdownTestInput<
   TAccountAuthority extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
   game: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
 };
 
 export function getShowdownTestInstruction<
   TAccountAuthority extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
-  input: ShowdownTestInput<
-    TAccountAuthority,
-    TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5
-  >,
+  input: ShowdownTestInput<TAccountAuthority, TAccountGame>,
   config?: { programAddress?: TProgramAddress },
-): ShowdownTestInstruction<
-  TProgramAddress,
-  TAccountAuthority,
-  TAccountGame,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5
-> {
+): ShowdownTestInstruction<TProgramAddress, TAccountAuthority, TAccountGame> {
   // Program address.
   const programAddress =
     config?.programAddress ?? AGENT_POKER_GAME_PROGRAM_ADDRESS;
@@ -175,12 +113,6 @@ export function getShowdownTestInstruction<
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: false },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: false },
-    hand1: { value: input.hand1 ?? null, isWritable: false },
-    hand2: { value: input.hand2 ?? null, isWritable: false },
-    hand3: { value: input.hand3 ?? null, isWritable: false },
-    hand4: { value: input.hand4 ?? null, isWritable: false },
-    hand5: { value: input.hand5 ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -192,25 +124,13 @@ export function getShowdownTestInstruction<
     accounts: [
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
     ],
     data: getShowdownTestInstructionDataEncoder().encode({}),
     programAddress,
   } as ShowdownTestInstruction<
     TProgramAddress,
     TAccountAuthority,
-    TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5
+    TAccountGame
   >);
 }
 
@@ -222,12 +142,6 @@ export type ParsedShowdownTestInstruction<
   accounts: {
     authority: TAccountMetas[0];
     game: TAccountMetas[1];
-    hand0: TAccountMetas[2];
-    hand1: TAccountMetas[3];
-    hand2: TAccountMetas[4];
-    hand3: TAccountMetas[5];
-    hand4: TAccountMetas[6];
-    hand5: TAccountMetas[7];
   };
   data: ShowdownTestInstructionData;
 };
@@ -240,7 +154,7 @@ export function parseShowdownTestInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedShowdownTestInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+  if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -252,16 +166,7 @@ export function parseShowdownTestInstruction<
   };
   return {
     programAddress: instruction.programAddress,
-    accounts: {
-      authority: getNextAccount(),
-      game: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
-    },
+    accounts: { authority: getNextAccount(), game: getNextAccount() },
     data: getShowdownTestInstructionDataDecoder().decode(instruction.data),
   };
 }

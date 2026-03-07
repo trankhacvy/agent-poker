@@ -47,12 +47,6 @@ export type CallbackShuffleInstruction<
   TAccountVrfProgramIdentity extends string | AccountMeta<string> =
     "9irBy75QS2BN81FUgXuHcjqceJJRuc9oDkAe8TKVvvAw",
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -65,24 +59,6 @@ export type CallbackShuffleInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountHand0 extends string
-        ? WritableAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? WritableAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? WritableAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? WritableAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? WritableAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? WritableAccount<TAccountHand5>
-        : TAccountHand5,
       ...TRemainingAccounts,
     ]
   >;
@@ -126,57 +102,24 @@ export function getCallbackShuffleInstructionDataCodec(): FixedSizeCodec<
 export type CallbackShuffleInput<
   TAccountVrfProgramIdentity extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
 > = {
   /** SECURITY: Must be signed by the VRF program to prevent spoofed callbacks */
   vrfProgramIdentity?: TransactionSigner<TAccountVrfProgramIdentity>;
   game: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
   randomness: CallbackShuffleInstructionDataArgs["randomness"];
 };
 
 export function getCallbackShuffleInstruction<
   TAccountVrfProgramIdentity extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
-  input: CallbackShuffleInput<
-    TAccountVrfProgramIdentity,
-    TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5
-  >,
+  input: CallbackShuffleInput<TAccountVrfProgramIdentity, TAccountGame>,
   config?: { programAddress?: TProgramAddress },
 ): CallbackShuffleInstruction<
   TProgramAddress,
   TAccountVrfProgramIdentity,
-  TAccountGame,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5
+  TAccountGame
 > {
   // Program address.
   const programAddress =
@@ -189,12 +132,6 @@ export function getCallbackShuffleInstruction<
       isWritable: false,
     },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -215,12 +152,6 @@ export function getCallbackShuffleInstruction<
     accounts: [
       getAccountMeta(accounts.vrfProgramIdentity),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
     ],
     data: getCallbackShuffleInstructionDataEncoder().encode(
       args as CallbackShuffleInstructionDataArgs,
@@ -229,13 +160,7 @@ export function getCallbackShuffleInstruction<
   } as CallbackShuffleInstruction<
     TProgramAddress,
     TAccountVrfProgramIdentity,
-    TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5
+    TAccountGame
   >);
 }
 
@@ -248,12 +173,6 @@ export type ParsedCallbackShuffleInstruction<
     /** SECURITY: Must be signed by the VRF program to prevent spoofed callbacks */
     vrfProgramIdentity: TAccountMetas[0];
     game: TAccountMetas[1];
-    hand0: TAccountMetas[2];
-    hand1: TAccountMetas[3];
-    hand2: TAccountMetas[4];
-    hand3: TAccountMetas[5];
-    hand4: TAccountMetas[6];
-    hand5: TAccountMetas[7];
   };
   data: CallbackShuffleInstructionData;
 };
@@ -266,7 +185,7 @@ export function parseCallbackShuffleInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCallbackShuffleInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 8) {
+  if (instruction.accounts.length < 2) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -278,16 +197,7 @@ export function parseCallbackShuffleInstruction<
   };
   return {
     programAddress: instruction.programAddress,
-    accounts: {
-      vrfProgramIdentity: getNextAccount(),
-      game: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
-    },
+    accounts: { vrfProgramIdentity: getNextAccount(), game: getNextAccount() },
     data: getCallbackShuffleInstructionDataDecoder().decode(instruction.data),
   };
 }

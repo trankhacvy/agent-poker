@@ -56,6 +56,7 @@ export type PlaceBetInstruction<
   TAccountBettor extends string | AccountMeta<string> = string,
   TAccountPool extends string | AccountMeta<string> = string,
   TAccountPoolVault extends string | AccountMeta<string> = string,
+  TAccountTreasury extends string | AccountMeta<string> = string,
   TAccountBet extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
@@ -74,6 +75,9 @@ export type PlaceBetInstruction<
       TAccountPoolVault extends string
         ? WritableAccount<TAccountPoolVault>
         : TAccountPoolVault,
+      TAccountTreasury extends string
+        ? ReadonlyAccount<TAccountTreasury>
+        : TAccountTreasury,
       TAccountBet extends string ? WritableAccount<TAccountBet> : TAccountBet,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
@@ -126,12 +130,14 @@ export type PlaceBetAsyncInput<
   TAccountBettor extends string = string,
   TAccountPool extends string = string,
   TAccountPoolVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountBet extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   bettor: TransactionSigner<TAccountBettor>;
   pool: Address<TAccountPool>;
   poolVault?: Address<TAccountPoolVault>;
+  treasury?: Address<TAccountTreasury>;
   bet?: Address<TAccountBet>;
   systemProgram?: Address<TAccountSystemProgram>;
   agentIndex: PlaceBetInstructionDataArgs["agentIndex"];
@@ -142,6 +148,7 @@ export async function getPlaceBetInstructionAsync<
   TAccountBettor extends string,
   TAccountPool extends string,
   TAccountPoolVault extends string,
+  TAccountTreasury extends string,
   TAccountBet extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_BETTING_PROGRAM_ADDRESS,
@@ -150,6 +157,7 @@ export async function getPlaceBetInstructionAsync<
     TAccountBettor,
     TAccountPool,
     TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >,
@@ -160,6 +168,7 @@ export async function getPlaceBetInstructionAsync<
     TAccountBettor,
     TAccountPool,
     TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >
@@ -173,6 +182,7 @@ export async function getPlaceBetInstructionAsync<
     bettor: { value: input.bettor ?? null, isWritable: true },
     pool: { value: input.pool ?? null, isWritable: true },
     poolVault: { value: input.poolVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: false },
     bet: { value: input.bet ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -193,6 +203,16 @@ export async function getPlaceBetInstructionAsync<
           new Uint8Array([112, 111, 111, 108, 95, 118, 97, 117, 108, 116]),
         ),
         getAddressEncoder().encode(expectAddress(accounts.pool.value)),
+      ],
+    });
+  }
+  if (!accounts.treasury.value) {
+    accounts.treasury.value = await getProgramDerivedAddress({
+      programAddress,
+      seeds: [
+        getBytesEncoder().encode(
+          new Uint8Array([116, 114, 101, 97, 115, 117, 114, 121]),
+        ),
       ],
     });
   }
@@ -217,6 +237,7 @@ export async function getPlaceBetInstructionAsync<
       getAccountMeta(accounts.bettor),
       getAccountMeta(accounts.pool),
       getAccountMeta(accounts.poolVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.bet),
       getAccountMeta(accounts.systemProgram),
     ],
@@ -229,6 +250,7 @@ export async function getPlaceBetInstructionAsync<
     TAccountBettor,
     TAccountPool,
     TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >);
@@ -238,12 +260,14 @@ export type PlaceBetInput<
   TAccountBettor extends string = string,
   TAccountPool extends string = string,
   TAccountPoolVault extends string = string,
+  TAccountTreasury extends string = string,
   TAccountBet extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   bettor: TransactionSigner<TAccountBettor>;
   pool: Address<TAccountPool>;
   poolVault: Address<TAccountPoolVault>;
+  treasury: Address<TAccountTreasury>;
   bet: Address<TAccountBet>;
   systemProgram?: Address<TAccountSystemProgram>;
   agentIndex: PlaceBetInstructionDataArgs["agentIndex"];
@@ -254,6 +278,7 @@ export function getPlaceBetInstruction<
   TAccountBettor extends string,
   TAccountPool extends string,
   TAccountPoolVault extends string,
+  TAccountTreasury extends string,
   TAccountBet extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_BETTING_PROGRAM_ADDRESS,
@@ -262,6 +287,7 @@ export function getPlaceBetInstruction<
     TAccountBettor,
     TAccountPool,
     TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >,
@@ -271,6 +297,7 @@ export function getPlaceBetInstruction<
   TAccountBettor,
   TAccountPool,
   TAccountPoolVault,
+  TAccountTreasury,
   TAccountBet,
   TAccountSystemProgram
 > {
@@ -283,6 +310,7 @@ export function getPlaceBetInstruction<
     bettor: { value: input.bettor ?? null, isWritable: true },
     pool: { value: input.pool ?? null, isWritable: true },
     poolVault: { value: input.poolVault ?? null, isWritable: true },
+    treasury: { value: input.treasury ?? null, isWritable: false },
     bet: { value: input.bet ?? null, isWritable: true },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
@@ -306,6 +334,7 @@ export function getPlaceBetInstruction<
       getAccountMeta(accounts.bettor),
       getAccountMeta(accounts.pool),
       getAccountMeta(accounts.poolVault),
+      getAccountMeta(accounts.treasury),
       getAccountMeta(accounts.bet),
       getAccountMeta(accounts.systemProgram),
     ],
@@ -318,6 +347,7 @@ export function getPlaceBetInstruction<
     TAccountBettor,
     TAccountPool,
     TAccountPoolVault,
+    TAccountTreasury,
     TAccountBet,
     TAccountSystemProgram
   >);
@@ -332,8 +362,9 @@ export type ParsedPlaceBetInstruction<
     bettor: TAccountMetas[0];
     pool: TAccountMetas[1];
     poolVault: TAccountMetas[2];
-    bet: TAccountMetas[3];
-    systemProgram: TAccountMetas[4];
+    treasury: TAccountMetas[3];
+    bet: TAccountMetas[4];
+    systemProgram: TAccountMetas[5];
   };
   data: PlaceBetInstructionData;
 };
@@ -346,7 +377,7 @@ export function parsePlaceBetInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedPlaceBetInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 5) {
+  if (instruction.accounts.length < 6) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -362,6 +393,7 @@ export function parsePlaceBetInstruction<
       bettor: getNextAccount(),
       pool: getNextAccount(),
       poolVault: getNextAccount(),
+      treasury: getNextAccount(),
       bet: getNextAccount(),
       systemProgram: getNextAccount(),
     },

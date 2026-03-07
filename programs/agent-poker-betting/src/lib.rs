@@ -8,8 +8,9 @@ pub const POOL_VAULT_SEED: &[u8] = b"pool_vault";
 pub const BET_SEED: &[u8] = b"bet";
 pub const TREASURY_SEED: &[u8] = b"treasury";
 
-pub const RAKE_BPS: u64 = 500; // 5%
-pub const BPS_BASE: u64 = 10_000;
+// Treasury model: 6 agents, fair odds 6x, 5% rake => 5.7x payout
+pub const PAYOUT_NUM: u64 = 57; // 5.7x = 57/10
+pub const PAYOUT_DEN: u64 = 10;
 
 #[program]
 pub mod agent_poker_betting {
@@ -33,12 +34,41 @@ pub mod agent_poker_betting {
         Ok(())
     }
 
+    pub fn fund_treasury(ctx: Context<FundTreasury>, amount: u64) -> Result<()> {
+        require!(amount > 0, BettingError::ZeroBetAmount);
+
+        system_program::transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.funder.to_account_info(),
+                    to: ctx.accounts.treasury.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
+        Ok(())
+    }
+
     pub fn place_bet(ctx: Context<PlaceBet>, agent_index: u8, amount: u64) -> Result<()> {
         require!(agent_index < 6, BettingError::InvalidAgentIndex);
         require!(amount > 0, BettingError::ZeroBetAmount);
 
         let pool = &mut ctx.accounts.pool;
         require!(pool.status == PoolStatus::Open, BettingError::PoolNotOpen);
+
+        // Solvency check: treasury must cover worst-case payout (5.7x)
+        let max_payout = amount
+            .checked_mul(PAYOUT_NUM)
+            .ok_or(BettingError::MathOverflow)?
+            .checked_div(PAYOUT_DEN)
+            .ok_or(BettingError::MathOverflow)?;
+        let treasury_balance = ctx.accounts.treasury.lamports();
+        require!(
+            treasury_balance >= max_payout,
+            BettingError::InsufficientTreasuryFunds
+        );
 
         system_program::transfer(
             CpiContext::new(
@@ -105,13 +135,11 @@ pub mod agent_poker_betting {
         pool.winner_index = Some(winner_index);
         pool.status = PoolStatus::Settled;
 
-        let rake = total_pool
-            .checked_mul(RAKE_BPS)
-            .ok_or(BettingError::MathOverflow)?
-            .checked_div(BPS_BASE)
-            .ok_or(BettingError::MathOverflow)?;
+        // Transfer ALL vault funds to treasury (house keeps bets)
+        if total_pool > 0 {
+            let vault_balance = ctx.accounts.pool_vault.lamports();
+            let transfer_amount = total_pool.min(vault_balance);
 
-        if rake > 0 {
             let vault_seeds: &[&[u8]] = &[
                 POOL_VAULT_SEED,
                 pool_key.as_ref(),
@@ -123,7 +151,7 @@ pub mod agent_poker_betting {
                 &ctx.accounts.treasury.to_account_info(),
                 &ctx.accounts.system_program.to_account_info(),
                 vault_seeds,
-                rake,
+                transfer_amount,
             )?;
         }
 
@@ -131,7 +159,6 @@ pub mod agent_poker_betting {
             pool: pool_key,
             winner_index,
             total_pool,
-            rake,
         });
 
         Ok(())
@@ -196,7 +223,7 @@ pub mod agent_poker_betting {
         Ok(())
     }
 
-    pub fn claim_winnings(ctx: Context<ClaimWinnings>, winning_pool_total: u64) -> Result<()> {
+    pub fn claim_winnings(ctx: Context<ClaimWinnings>) -> Result<()> {
         let pool = &ctx.accounts.pool;
         let bet = &mut ctx.accounts.bet;
 
@@ -211,42 +238,36 @@ pub mod agent_poker_betting {
             bet.agent_index == winner_index,
             BettingError::BetNotOnWinner
         );
-        require!(winning_pool_total > 0, BettingError::ZeroWinningPool);
 
-        let rake = pool
-            .total_pool
-            .checked_mul(RAKE_BPS)
+        // Fixed payout: 5.7x (6 agents * 0.95 after rake)
+        let payout = bet
+            .amount
+            .checked_mul(PAYOUT_NUM)
             .ok_or(BettingError::MathOverflow)?
-            .checked_div(BPS_BASE)
+            .checked_div(PAYOUT_DEN)
             .ok_or(BettingError::MathOverflow)?;
-
-        let pool_after_rake = pool
-            .total_pool
-            .checked_sub(rake)
-            .ok_or(BettingError::MathOverflow)?;
-
-        let payout = (bet.amount as u128)
-            .checked_mul(pool_after_rake as u128)
-            .ok_or(BettingError::MathOverflow)?
-            .checked_div(winning_pool_total as u128)
-            .ok_or(BettingError::MathOverflow)? as u64;
 
         require!(payout > 0, BettingError::ZeroPayout);
 
+        // Check treasury solvency
+        let treasury_balance = ctx.accounts.treasury.lamports();
+        require!(
+            treasury_balance >= payout,
+            BettingError::InsufficientTreasuryFunds
+        );
+
         bet.claimed = true;
 
-        let pool_key = ctx.accounts.pool.key();
-        let vault_seeds: &[&[u8]] = &[
-            POOL_VAULT_SEED,
-            pool_key.as_ref(),
-            &[pool.vault_bump],
+        let treasury_seeds: &[&[u8]] = &[
+            TREASURY_SEED,
+            &[ctx.bumps.treasury],
         ];
 
         transfer_from_vault(
-            &ctx.accounts.pool_vault.to_account_info(),
+            &ctx.accounts.treasury.to_account_info(),
             &ctx.accounts.bettor.to_account_info(),
             &ctx.accounts.system_program.to_account_info(),
-            vault_seeds,
+            treasury_seeds,
             payout,
         )?;
 
@@ -307,6 +328,22 @@ pub struct CreatePool<'info> {
 }
 
 #[derive(Accounts)]
+pub struct FundTreasury<'info> {
+    #[account(mut)]
+    pub funder: Signer<'info>,
+
+    /// CHECK: Treasury PDA that holds house funds.
+    #[account(
+        mut,
+        seeds = [TREASURY_SEED],
+        bump,
+    )]
+    pub treasury: SystemAccount<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct PlaceBet<'info> {
     #[account(mut)]
     pub bettor: Signer<'info>,
@@ -325,6 +362,13 @@ pub struct PlaceBet<'info> {
         bump = pool.vault_bump,
     )]
     pub pool_vault: SystemAccount<'info>,
+
+    /// CHECK: Treasury PDA for solvency check.
+    #[account(
+        seeds = [TREASURY_SEED],
+        bump,
+    )]
+    pub treasury: SystemAccount<'info>,
 
     #[account(
         init,
@@ -371,7 +415,7 @@ pub struct SettlePool<'info> {
     )]
     pub pool_vault: SystemAccount<'info>,
 
-    /// CHECK: Treasury PDA where rake is sent.
+    /// CHECK: Treasury PDA where all bets are sent.
     #[account(
         mut,
         seeds = [TREASURY_SEED],
@@ -464,13 +508,13 @@ pub struct ClaimWinnings<'info> {
     )]
     pub pool: Account<'info, BettingPool>,
 
-    /// CHECK: Pool vault PDA that holds SOL for the pool.
+    /// CHECK: Treasury PDA that holds house funds for payouts.
     #[account(
         mut,
-        seeds = [POOL_VAULT_SEED, pool.key().as_ref()],
-        bump = pool.vault_bump,
+        seeds = [TREASURY_SEED],
+        bump,
     )]
-    pub pool_vault: SystemAccount<'info>,
+    pub treasury: SystemAccount<'info>,
 
     #[account(
         mut,
@@ -535,7 +579,12 @@ pub struct PoolSettled {
     pub pool: Pubkey,
     pub winner_index: u8,
     pub total_pool: u64,
-    pub rake: u64,
+}
+
+#[event]
+pub struct PoolCancelled {
+    pub pool: Pubkey,
+    pub total_pool: u64,
 }
 
 #[event]
@@ -543,12 +592,6 @@ pub struct WinningsClaimed {
     pub pool: Pubkey,
     pub bettor: Pubkey,
     pub payout: u64,
-}
-
-#[event]
-pub struct PoolCancelled {
-    pub pool: Pubkey,
-    pub total_pool: u64,
 }
 
 #[event]
@@ -607,4 +650,7 @@ pub enum BettingError {
 
     #[msg("Pool is still active (must be Settled or Cancelled)")]
     PoolStillActive,
+
+    #[msg("Insufficient treasury funds to cover payout")]
+    InsufficientTreasuryFunds,
 }

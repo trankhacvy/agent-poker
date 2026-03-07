@@ -63,19 +63,18 @@ export type JoinGameInstruction<
   TAccountDelegationMetadataPlayerHand extends string | AccountMeta<string> =
     string,
   TAccountPlayerHand extends string | AccountMeta<string> = string,
-  TAccountPermission extends string | AccountMeta<string> = string,
+  TAccountHandPermission extends string | AccountMeta<string> = string,
   TAccountPermDelegationBuffer extends string | AccountMeta<string> = string,
   TAccountPermDelegationRecord extends string | AccountMeta<string> = string,
   TAccountPermDelegationMetadata extends string | AccountMeta<string> = string,
   TAccountValidator extends string | AccountMeta<string> = string,
   TAccountPermissionProgram extends string | AccountMeta<string> =
     "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
+  TAccountDelegationProgram extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountOwnerProgram extends string | AccountMeta<string> =
     "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr",
-  TAccountDelegationProgram extends string | AccountMeta<string> =
-    "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
 > = Instruction<TProgram> &
   InstructionWithData<ReadonlyUint8Array> &
@@ -100,9 +99,9 @@ export type JoinGameInstruction<
       TAccountPlayerHand extends string
         ? WritableAccount<TAccountPlayerHand>
         : TAccountPlayerHand,
-      TAccountPermission extends string
-        ? WritableAccount<TAccountPermission>
-        : TAccountPermission,
+      TAccountHandPermission extends string
+        ? WritableAccount<TAccountHandPermission>
+        : TAccountHandPermission,
       TAccountPermDelegationBuffer extends string
         ? WritableAccount<TAccountPermDelegationBuffer>
         : TAccountPermDelegationBuffer,
@@ -118,15 +117,15 @@ export type JoinGameInstruction<
       TAccountPermissionProgram extends string
         ? ReadonlyAccount<TAccountPermissionProgram>
         : TAccountPermissionProgram,
+      TAccountDelegationProgram extends string
+        ? ReadonlyAccount<TAccountDelegationProgram>
+        : TAccountDelegationProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
       TAccountOwnerProgram extends string
         ? ReadonlyAccount<TAccountOwnerProgram>
         : TAccountOwnerProgram,
-      TAccountDelegationProgram extends string
-        ? ReadonlyAccount<TAccountDelegationProgram>
-        : TAccountDelegationProgram,
       ...TRemainingAccounts,
     ]
   >;
@@ -182,15 +181,15 @@ export type JoinGameAsyncInput<
   TAccountDelegationRecordPlayerHand extends string = string,
   TAccountDelegationMetadataPlayerHand extends string = string,
   TAccountPlayerHand extends string = string,
-  TAccountPermission extends string = string,
+  TAccountHandPermission extends string = string,
   TAccountPermDelegationBuffer extends string = string,
   TAccountPermDelegationRecord extends string = string,
   TAccountPermDelegationMetadata extends string = string,
   TAccountValidator extends string = string,
   TAccountPermissionProgram extends string = string,
+  TAccountDelegationProgram extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountOwnerProgram extends string = string,
-  TAccountDelegationProgram extends string = string,
 > = {
   payer: TransactionSigner<TAccountPayer>;
   game?: Address<TAccountGame>;
@@ -198,15 +197,15 @@ export type JoinGameAsyncInput<
   delegationRecordPlayerHand?: Address<TAccountDelegationRecordPlayerHand>;
   delegationMetadataPlayerHand?: Address<TAccountDelegationMetadataPlayerHand>;
   playerHand: Address<TAccountPlayerHand>;
-  permission: Address<TAccountPermission>;
+  handPermission: Address<TAccountHandPermission>;
   permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
   permDelegationRecord: Address<TAccountPermDelegationRecord>;
   permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
   validator: Address<TAccountValidator>;
   permissionProgram?: Address<TAccountPermissionProgram>;
+  delegationProgram: Address<TAccountDelegationProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   ownerProgram?: Address<TAccountOwnerProgram>;
-  delegationProgram?: Address<TAccountDelegationProgram>;
   gameId: JoinGameInstructionDataArgs["gameId"];
   seatIndex: JoinGameInstructionDataArgs["seatIndex"];
   player: JoinGameInstructionDataArgs["player"];
@@ -219,15 +218,15 @@ export async function getJoinGameInstructionAsync<
   TAccountDelegationRecordPlayerHand extends string,
   TAccountDelegationMetadataPlayerHand extends string,
   TAccountPlayerHand extends string,
-  TAccountPermission extends string,
+  TAccountHandPermission extends string,
   TAccountPermDelegationBuffer extends string,
   TAccountPermDelegationRecord extends string,
   TAccountPermDelegationMetadata extends string,
   TAccountValidator extends string,
   TAccountPermissionProgram extends string,
+  TAccountDelegationProgram extends string,
   TAccountSystemProgram extends string,
   TAccountOwnerProgram extends string,
-  TAccountDelegationProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: JoinGameAsyncInput<
@@ -237,15 +236,15 @@ export async function getJoinGameInstructionAsync<
     TAccountDelegationRecordPlayerHand,
     TAccountDelegationMetadataPlayerHand,
     TAccountPlayerHand,
-    TAccountPermission,
+    TAccountHandPermission,
     TAccountPermDelegationBuffer,
     TAccountPermDelegationRecord,
     TAccountPermDelegationMetadata,
     TAccountValidator,
     TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram,
-    TAccountOwnerProgram,
-    TAccountDelegationProgram
+    TAccountOwnerProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
@@ -257,15 +256,15 @@ export async function getJoinGameInstructionAsync<
     TAccountDelegationRecordPlayerHand,
     TAccountDelegationMetadataPlayerHand,
     TAccountPlayerHand,
-    TAccountPermission,
+    TAccountHandPermission,
     TAccountPermDelegationBuffer,
     TAccountPermDelegationRecord,
     TAccountPermDelegationMetadata,
     TAccountValidator,
     TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram,
-    TAccountOwnerProgram,
-    TAccountDelegationProgram
+    TAccountOwnerProgram
   >
 > {
   // Program address.
@@ -289,7 +288,7 @@ export async function getJoinGameInstructionAsync<
       isWritable: true,
     },
     playerHand: { value: input.playerHand ?? null, isWritable: true },
-    permission: { value: input.permission ?? null, isWritable: true },
+    handPermission: { value: input.handPermission ?? null, isWritable: true },
     permDelegationBuffer: {
       value: input.permDelegationBuffer ?? null,
       isWritable: true,
@@ -307,12 +306,12 @@ export async function getJoinGameInstructionAsync<
       value: input.permissionProgram ?? null,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
     delegationProgram: {
       value: input.delegationProgram ?? null,
       isWritable: false,
     },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -382,10 +381,6 @@ export async function getJoinGameInstructionAsync<
     accounts.ownerProgram.value =
       "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr" as Address<"4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr">;
   }
-  if (!accounts.delegationProgram.value) {
-    accounts.delegationProgram.value =
-      "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh" as Address<"DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh">;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -396,15 +391,15 @@ export async function getJoinGameInstructionAsync<
       getAccountMeta(accounts.delegationRecordPlayerHand),
       getAccountMeta(accounts.delegationMetadataPlayerHand),
       getAccountMeta(accounts.playerHand),
-      getAccountMeta(accounts.permission),
+      getAccountMeta(accounts.handPermission),
       getAccountMeta(accounts.permDelegationBuffer),
       getAccountMeta(accounts.permDelegationRecord),
       getAccountMeta(accounts.permDelegationMetadata),
       getAccountMeta(accounts.validator),
       getAccountMeta(accounts.permissionProgram),
+      getAccountMeta(accounts.delegationProgram),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.ownerProgram),
-      getAccountMeta(accounts.delegationProgram),
     ],
     data: getJoinGameInstructionDataEncoder().encode(
       args as JoinGameInstructionDataArgs,
@@ -418,15 +413,15 @@ export async function getJoinGameInstructionAsync<
     TAccountDelegationRecordPlayerHand,
     TAccountDelegationMetadataPlayerHand,
     TAccountPlayerHand,
-    TAccountPermission,
+    TAccountHandPermission,
     TAccountPermDelegationBuffer,
     TAccountPermDelegationRecord,
     TAccountPermDelegationMetadata,
     TAccountValidator,
     TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram,
-    TAccountOwnerProgram,
-    TAccountDelegationProgram
+    TAccountOwnerProgram
   >);
 }
 
@@ -437,15 +432,15 @@ export type JoinGameInput<
   TAccountDelegationRecordPlayerHand extends string = string,
   TAccountDelegationMetadataPlayerHand extends string = string,
   TAccountPlayerHand extends string = string,
-  TAccountPermission extends string = string,
+  TAccountHandPermission extends string = string,
   TAccountPermDelegationBuffer extends string = string,
   TAccountPermDelegationRecord extends string = string,
   TAccountPermDelegationMetadata extends string = string,
   TAccountValidator extends string = string,
   TAccountPermissionProgram extends string = string,
+  TAccountDelegationProgram extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountOwnerProgram extends string = string,
-  TAccountDelegationProgram extends string = string,
 > = {
   payer: TransactionSigner<TAccountPayer>;
   game: Address<TAccountGame>;
@@ -453,15 +448,15 @@ export type JoinGameInput<
   delegationRecordPlayerHand: Address<TAccountDelegationRecordPlayerHand>;
   delegationMetadataPlayerHand: Address<TAccountDelegationMetadataPlayerHand>;
   playerHand: Address<TAccountPlayerHand>;
-  permission: Address<TAccountPermission>;
+  handPermission: Address<TAccountHandPermission>;
   permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
   permDelegationRecord: Address<TAccountPermDelegationRecord>;
   permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
   validator: Address<TAccountValidator>;
   permissionProgram?: Address<TAccountPermissionProgram>;
+  delegationProgram: Address<TAccountDelegationProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   ownerProgram?: Address<TAccountOwnerProgram>;
-  delegationProgram?: Address<TAccountDelegationProgram>;
   gameId: JoinGameInstructionDataArgs["gameId"];
   seatIndex: JoinGameInstructionDataArgs["seatIndex"];
   player: JoinGameInstructionDataArgs["player"];
@@ -474,15 +469,15 @@ export function getJoinGameInstruction<
   TAccountDelegationRecordPlayerHand extends string,
   TAccountDelegationMetadataPlayerHand extends string,
   TAccountPlayerHand extends string,
-  TAccountPermission extends string,
+  TAccountHandPermission extends string,
   TAccountPermDelegationBuffer extends string,
   TAccountPermDelegationRecord extends string,
   TAccountPermDelegationMetadata extends string,
   TAccountValidator extends string,
   TAccountPermissionProgram extends string,
+  TAccountDelegationProgram extends string,
   TAccountSystemProgram extends string,
   TAccountOwnerProgram extends string,
-  TAccountDelegationProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: JoinGameInput<
@@ -492,15 +487,15 @@ export function getJoinGameInstruction<
     TAccountDelegationRecordPlayerHand,
     TAccountDelegationMetadataPlayerHand,
     TAccountPlayerHand,
-    TAccountPermission,
+    TAccountHandPermission,
     TAccountPermDelegationBuffer,
     TAccountPermDelegationRecord,
     TAccountPermDelegationMetadata,
     TAccountValidator,
     TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram,
-    TAccountOwnerProgram,
-    TAccountDelegationProgram
+    TAccountOwnerProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): JoinGameInstruction<
@@ -511,15 +506,15 @@ export function getJoinGameInstruction<
   TAccountDelegationRecordPlayerHand,
   TAccountDelegationMetadataPlayerHand,
   TAccountPlayerHand,
-  TAccountPermission,
+  TAccountHandPermission,
   TAccountPermDelegationBuffer,
   TAccountPermDelegationRecord,
   TAccountPermDelegationMetadata,
   TAccountValidator,
   TAccountPermissionProgram,
+  TAccountDelegationProgram,
   TAccountSystemProgram,
-  TAccountOwnerProgram,
-  TAccountDelegationProgram
+  TAccountOwnerProgram
 > {
   // Program address.
   const programAddress =
@@ -542,7 +537,7 @@ export function getJoinGameInstruction<
       isWritable: true,
     },
     playerHand: { value: input.playerHand ?? null, isWritable: true },
-    permission: { value: input.permission ?? null, isWritable: true },
+    handPermission: { value: input.handPermission ?? null, isWritable: true },
     permDelegationBuffer: {
       value: input.permDelegationBuffer ?? null,
       isWritable: true,
@@ -560,12 +555,12 @@ export function getJoinGameInstruction<
       value: input.permissionProgram ?? null,
       isWritable: false,
     },
-    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
-    ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
     delegationProgram: {
       value: input.delegationProgram ?? null,
       isWritable: false,
     },
+    systemProgram: { value: input.systemProgram ?? null, isWritable: false },
+    ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
     keyof typeof originalAccounts,
@@ -588,10 +583,6 @@ export function getJoinGameInstruction<
     accounts.ownerProgram.value =
       "4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr" as Address<"4dnm62opQrwADRgKFoGHrpt8zCWkheTRrs3uVCAa3bRr">;
   }
-  if (!accounts.delegationProgram.value) {
-    accounts.delegationProgram.value =
-      "DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh" as Address<"DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh">;
-  }
 
   const getAccountMeta = getAccountMetaFactory(programAddress, "programId");
   return Object.freeze({
@@ -602,15 +593,15 @@ export function getJoinGameInstruction<
       getAccountMeta(accounts.delegationRecordPlayerHand),
       getAccountMeta(accounts.delegationMetadataPlayerHand),
       getAccountMeta(accounts.playerHand),
-      getAccountMeta(accounts.permission),
+      getAccountMeta(accounts.handPermission),
       getAccountMeta(accounts.permDelegationBuffer),
       getAccountMeta(accounts.permDelegationRecord),
       getAccountMeta(accounts.permDelegationMetadata),
       getAccountMeta(accounts.validator),
       getAccountMeta(accounts.permissionProgram),
+      getAccountMeta(accounts.delegationProgram),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.ownerProgram),
-      getAccountMeta(accounts.delegationProgram),
     ],
     data: getJoinGameInstructionDataEncoder().encode(
       args as JoinGameInstructionDataArgs,
@@ -624,15 +615,15 @@ export function getJoinGameInstruction<
     TAccountDelegationRecordPlayerHand,
     TAccountDelegationMetadataPlayerHand,
     TAccountPlayerHand,
-    TAccountPermission,
+    TAccountHandPermission,
     TAccountPermDelegationBuffer,
     TAccountPermDelegationRecord,
     TAccountPermDelegationMetadata,
     TAccountValidator,
     TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram,
-    TAccountOwnerProgram,
-    TAccountDelegationProgram
+    TAccountOwnerProgram
   >);
 }
 
@@ -648,15 +639,15 @@ export type ParsedJoinGameInstruction<
     delegationRecordPlayerHand: TAccountMetas[3];
     delegationMetadataPlayerHand: TAccountMetas[4];
     playerHand: TAccountMetas[5];
-    permission: TAccountMetas[6];
+    handPermission: TAccountMetas[6];
     permDelegationBuffer: TAccountMetas[7];
     permDelegationRecord: TAccountMetas[8];
     permDelegationMetadata: TAccountMetas[9];
     validator: TAccountMetas[10];
     permissionProgram: TAccountMetas[11];
-    systemProgram: TAccountMetas[12];
-    ownerProgram: TAccountMetas[13];
-    delegationProgram: TAccountMetas[14];
+    delegationProgram: TAccountMetas[12];
+    systemProgram: TAccountMetas[13];
+    ownerProgram: TAccountMetas[14];
   };
   data: JoinGameInstructionData;
 };
@@ -688,15 +679,15 @@ export function parseJoinGameInstruction<
       delegationRecordPlayerHand: getNextAccount(),
       delegationMetadataPlayerHand: getNextAccount(),
       playerHand: getNextAccount(),
-      permission: getNextAccount(),
+      handPermission: getNextAccount(),
       permDelegationBuffer: getNextAccount(),
       permDelegationRecord: getNextAccount(),
       permDelegationMetadata: getNextAccount(),
       validator: getNextAccount(),
       permissionProgram: getNextAccount(),
+      delegationProgram: getNextAccount(),
       systemProgram: getNextAccount(),
       ownerProgram: getNextAccount(),
-      delegationProgram: getNextAccount(),
     },
     data: getJoinGameInstructionDataDecoder().decode(instruction.data),
   };

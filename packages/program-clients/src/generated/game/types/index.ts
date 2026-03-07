@@ -6,7 +6,5 @@
  * @see https://github.com/codama-idl/codama
  */
 
-export * from "./accountType";
 export * from "./gameFinished";
 export * from "./gamePhase";
-export * from "./member";

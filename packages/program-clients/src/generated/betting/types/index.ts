@@ -7,6 +7,8 @@
  */
 
 export * from "./betPlaced";
+export * from "./betRefunded";
+export * from "./poolCancelled";
 export * from "./poolLocked";
 export * from "./poolSettled";
 export * from "./poolStatus";

@@ -156,11 +156,22 @@ export class Orchestrator {
         },
         "Requesting LLM action"
       );
-      const action = await this.llmGateway.getAction(
-        player.template,
-        localState,
-        currentIdx
-      );
+
+      // FAST_GAME: skip LLM, everyone folds except the forced winner
+      const fastGame = process.env.FAST_GAME === "true";
+      const forcedWinnerIdx = parseInt(process.env.FORCE_WINNER_INDEX ?? "", 10);
+      let action: GameAction;
+      if (fastGame && !isNaN(forcedWinnerIdx)) {
+        action = currentIdx === forcedWinnerIdx
+          ? { type: "call", reasoning: "[fast-game] auto-call" }
+          : { type: "fold", reasoning: "[fast-game] auto-fold" };
+      } else {
+        action = await this.llmGateway.getAction(
+          player.template,
+          localState,
+          currentIdx
+        );
+      }
 
       const actionCode = ACTION_MAP[action.type] ?? 1;
       const raiseAmount = action.amount ?? 0;

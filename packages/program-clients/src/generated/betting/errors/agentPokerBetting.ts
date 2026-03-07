@@ -42,18 +42,27 @@ export const AGENT_POKER_BETTING_ERROR__UNAUTHORIZED = 0x177b; // 6011
 export const AGENT_POKER_BETTING_ERROR__POOL_MISMATCH = 0x177c; // 6012
 /** InsufficientVaultFunds: Insufficient funds in vault */
 export const AGENT_POKER_BETTING_ERROR__INSUFFICIENT_VAULT_FUNDS = 0x177d; // 6013
+/** PoolNotCancelled: Pool is not cancelled */
+export const AGENT_POKER_BETTING_ERROR__POOL_NOT_CANCELLED = 0x177e; // 6014
+/** PoolStillActive: Pool is still active (must be Settled or Cancelled) */
+export const AGENT_POKER_BETTING_ERROR__POOL_STILL_ACTIVE = 0x177f; // 6015
+/** InsufficientTreasuryFunds: Insufficient treasury funds to cover payout */
+export const AGENT_POKER_BETTING_ERROR__INSUFFICIENT_TREASURY_FUNDS = 0x1780; // 6016
 
 export type AgentPokerBettingError =
   | typeof AGENT_POKER_BETTING_ERROR__ALREADY_CLAIMED
   | typeof AGENT_POKER_BETTING_ERROR__BET_NOT_ON_WINNER
+  | typeof AGENT_POKER_BETTING_ERROR__INSUFFICIENT_TREASURY_FUNDS
   | typeof AGENT_POKER_BETTING_ERROR__INSUFFICIENT_VAULT_FUNDS
   | typeof AGENT_POKER_BETTING_ERROR__INVALID_AGENT_INDEX
   | typeof AGENT_POKER_BETTING_ERROR__MATH_OVERFLOW
   | typeof AGENT_POKER_BETTING_ERROR__NO_WINNER_SET
   | typeof AGENT_POKER_BETTING_ERROR__POOL_MISMATCH
+  | typeof AGENT_POKER_BETTING_ERROR__POOL_NOT_CANCELLED
   | typeof AGENT_POKER_BETTING_ERROR__POOL_NOT_LOCKED
   | typeof AGENT_POKER_BETTING_ERROR__POOL_NOT_OPEN
   | typeof AGENT_POKER_BETTING_ERROR__POOL_NOT_SETTLED
+  | typeof AGENT_POKER_BETTING_ERROR__POOL_STILL_ACTIVE
   | typeof AGENT_POKER_BETTING_ERROR__UNAUTHORIZED
   | typeof AGENT_POKER_BETTING_ERROR__ZERO_BET_AMOUNT
   | typeof AGENT_POKER_BETTING_ERROR__ZERO_PAYOUT
@@ -66,14 +75,17 @@ if (process.env.NODE_ENV !== "production") {
   agentPokerBettingErrorMessages = {
     [AGENT_POKER_BETTING_ERROR__ALREADY_CLAIMED]: `Winnings already claimed`,
     [AGENT_POKER_BETTING_ERROR__BET_NOT_ON_WINNER]: `Bet was not placed on the winning agent`,
+    [AGENT_POKER_BETTING_ERROR__INSUFFICIENT_TREASURY_FUNDS]: `Insufficient treasury funds to cover payout`,
     [AGENT_POKER_BETTING_ERROR__INSUFFICIENT_VAULT_FUNDS]: `Insufficient funds in vault`,
     [AGENT_POKER_BETTING_ERROR__INVALID_AGENT_INDEX]: `Agent index must be 0-5`,
     [AGENT_POKER_BETTING_ERROR__MATH_OVERFLOW]: `Math overflow`,
     [AGENT_POKER_BETTING_ERROR__NO_WINNER_SET]: `No winner has been set`,
     [AGENT_POKER_BETTING_ERROR__POOL_MISMATCH]: `Pool does not match bet`,
+    [AGENT_POKER_BETTING_ERROR__POOL_NOT_CANCELLED]: `Pool is not cancelled`,
     [AGENT_POKER_BETTING_ERROR__POOL_NOT_LOCKED]: `Pool is not locked`,
     [AGENT_POKER_BETTING_ERROR__POOL_NOT_OPEN]: `Pool is not open for betting`,
     [AGENT_POKER_BETTING_ERROR__POOL_NOT_SETTLED]: `Pool is not settled`,
+    [AGENT_POKER_BETTING_ERROR__POOL_STILL_ACTIVE]: `Pool is still active (must be Settled or Cancelled)`,
     [AGENT_POKER_BETTING_ERROR__UNAUTHORIZED]: `Unauthorized`,
     [AGENT_POKER_BETTING_ERROR__ZERO_BET_AMOUNT]: `Bet amount must be greater than zero`,
     [AGENT_POKER_BETTING_ERROR__ZERO_PAYOUT]: `Payout is zero`,

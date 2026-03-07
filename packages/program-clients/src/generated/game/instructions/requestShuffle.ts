@@ -54,12 +54,6 @@ export type RequestShuffleInstruction<
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountOracleQueue extends string | AccountMeta<string> =
     "5hBR571xnXppuCPveTrctfTU7tJLSN94nq7kv7FRK5Tc",
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
   TAccountProgramIdentity extends string | AccountMeta<string> = string,
   TAccountVrfProgram extends string | AccountMeta<string> =
     "Vrf1RNUjXmQGjmQrQLvJHs9SNkvDJEsRVFPkfSQUwGz",
@@ -86,24 +80,6 @@ export type RequestShuffleInstruction<
       TAccountOracleQueue extends string
         ? WritableAccount<TAccountOracleQueue>
         : TAccountOracleQueue,
-      TAccountHand0 extends string
-        ? ReadonlyAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? ReadonlyAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? ReadonlyAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? ReadonlyAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? ReadonlyAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? ReadonlyAccount<TAccountHand5>
-        : TAccountHand5,
       TAccountProgramIdentity extends string
         ? ReadonlyAccount<TAccountProgramIdentity>
         : TAccountProgramIdentity,
@@ -159,12 +135,6 @@ export type RequestShuffleAsyncInput<
   TAccountGame extends string = string,
   TAccountAuthority extends string = string,
   TAccountOracleQueue extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
   TAccountProgramIdentity extends string = string,
   TAccountVrfProgram extends string = string,
   TAccountSlotHashes extends string = string,
@@ -174,12 +144,6 @@ export type RequestShuffleAsyncInput<
   game: Address<TAccountGame>;
   authority: TransactionSigner<TAccountAuthority>;
   oracleQueue?: Address<TAccountOracleQueue>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
   programIdentity?: Address<TAccountProgramIdentity>;
   vrfProgram?: Address<TAccountVrfProgram>;
   slotHashes?: Address<TAccountSlotHashes>;
@@ -192,12 +156,6 @@ export async function getRequestShuffleInstructionAsync<
   TAccountGame extends string,
   TAccountAuthority extends string,
   TAccountOracleQueue extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TAccountProgramIdentity extends string,
   TAccountVrfProgram extends string,
   TAccountSlotHashes extends string,
@@ -209,12 +167,6 @@ export async function getRequestShuffleInstructionAsync<
     TAccountGame,
     TAccountAuthority,
     TAccountOracleQueue,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountProgramIdentity,
     TAccountVrfProgram,
     TAccountSlotHashes,
@@ -228,12 +180,6 @@ export async function getRequestShuffleInstructionAsync<
     TAccountGame,
     TAccountAuthority,
     TAccountOracleQueue,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountProgramIdentity,
     TAccountVrfProgram,
     TAccountSlotHashes,
@@ -250,12 +196,6 @@ export async function getRequestShuffleInstructionAsync<
     game: { value: input.game ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: false },
     oracleQueue: { value: input.oracleQueue ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: false },
-    hand1: { value: input.hand1 ?? null, isWritable: false },
-    hand2: { value: input.hand2 ?? null, isWritable: false },
-    hand3: { value: input.hand3 ?? null, isWritable: false },
-    hand4: { value: input.hand4 ?? null, isWritable: false },
-    hand5: { value: input.hand5 ?? null, isWritable: false },
     programIdentity: {
       value: input.programIdentity ?? null,
       isWritable: false,
@@ -307,12 +247,6 @@ export async function getRequestShuffleInstructionAsync<
       getAccountMeta(accounts.game),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.oracleQueue),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
       getAccountMeta(accounts.programIdentity),
       getAccountMeta(accounts.vrfProgram),
       getAccountMeta(accounts.slotHashes),
@@ -328,12 +262,6 @@ export async function getRequestShuffleInstructionAsync<
     TAccountGame,
     TAccountAuthority,
     TAccountOracleQueue,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountProgramIdentity,
     TAccountVrfProgram,
     TAccountSlotHashes,
@@ -346,12 +274,6 @@ export type RequestShuffleInput<
   TAccountGame extends string = string,
   TAccountAuthority extends string = string,
   TAccountOracleQueue extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
   TAccountProgramIdentity extends string = string,
   TAccountVrfProgram extends string = string,
   TAccountSlotHashes extends string = string,
@@ -361,12 +283,6 @@ export type RequestShuffleInput<
   game: Address<TAccountGame>;
   authority: TransactionSigner<TAccountAuthority>;
   oracleQueue?: Address<TAccountOracleQueue>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
   programIdentity: Address<TAccountProgramIdentity>;
   vrfProgram?: Address<TAccountVrfProgram>;
   slotHashes?: Address<TAccountSlotHashes>;
@@ -379,12 +295,6 @@ export function getRequestShuffleInstruction<
   TAccountGame extends string,
   TAccountAuthority extends string,
   TAccountOracleQueue extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
   TAccountProgramIdentity extends string,
   TAccountVrfProgram extends string,
   TAccountSlotHashes extends string,
@@ -396,12 +306,6 @@ export function getRequestShuffleInstruction<
     TAccountGame,
     TAccountAuthority,
     TAccountOracleQueue,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountProgramIdentity,
     TAccountVrfProgram,
     TAccountSlotHashes,
@@ -414,12 +318,6 @@ export function getRequestShuffleInstruction<
   TAccountGame,
   TAccountAuthority,
   TAccountOracleQueue,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5,
   TAccountProgramIdentity,
   TAccountVrfProgram,
   TAccountSlotHashes,
@@ -435,12 +333,6 @@ export function getRequestShuffleInstruction<
     game: { value: input.game ?? null, isWritable: true },
     authority: { value: input.authority ?? null, isWritable: false },
     oracleQueue: { value: input.oracleQueue ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: false },
-    hand1: { value: input.hand1 ?? null, isWritable: false },
-    hand2: { value: input.hand2 ?? null, isWritable: false },
-    hand3: { value: input.hand3 ?? null, isWritable: false },
-    hand4: { value: input.hand4 ?? null, isWritable: false },
-    hand5: { value: input.hand5 ?? null, isWritable: false },
     programIdentity: {
       value: input.programIdentity ?? null,
       isWritable: false,
@@ -482,12 +374,6 @@ export function getRequestShuffleInstruction<
       getAccountMeta(accounts.game),
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.oracleQueue),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
       getAccountMeta(accounts.programIdentity),
       getAccountMeta(accounts.vrfProgram),
       getAccountMeta(accounts.slotHashes),
@@ -503,12 +389,6 @@ export function getRequestShuffleInstruction<
     TAccountGame,
     TAccountAuthority,
     TAccountOracleQueue,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
     TAccountProgramIdentity,
     TAccountVrfProgram,
     TAccountSlotHashes,
@@ -526,16 +406,10 @@ export type ParsedRequestShuffleInstruction<
     game: TAccountMetas[1];
     authority: TAccountMetas[2];
     oracleQueue: TAccountMetas[3];
-    hand0: TAccountMetas[4];
-    hand1: TAccountMetas[5];
-    hand2: TAccountMetas[6];
-    hand3: TAccountMetas[7];
-    hand4: TAccountMetas[8];
-    hand5: TAccountMetas[9];
-    programIdentity: TAccountMetas[10];
-    vrfProgram: TAccountMetas[11];
-    slotHashes: TAccountMetas[12];
-    systemProgram: TAccountMetas[13];
+    programIdentity: TAccountMetas[4];
+    vrfProgram: TAccountMetas[5];
+    slotHashes: TAccountMetas[6];
+    systemProgram: TAccountMetas[7];
   };
   data: RequestShuffleInstructionData;
 };
@@ -548,7 +422,7 @@ export function parseRequestShuffleInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedRequestShuffleInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 14) {
+  if (instruction.accounts.length < 8) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -565,12 +439,6 @@ export function parseRequestShuffleInstruction<
       game: getNextAccount(),
       authority: getNextAccount(),
       oracleQueue: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
       programIdentity: getNextAccount(),
       vrfProgram: getNextAccount(),
       slotHashes: getNextAccount(),

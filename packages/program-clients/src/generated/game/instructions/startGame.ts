@@ -57,13 +57,7 @@ export type StartGameInstruction<
   TAccountDelegationRecordGame extends string | AccountMeta<string> = string,
   TAccountDelegationMetadataGame extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountPermission extends string | AccountMeta<string> = string,
-  TAccountPermDelegationBuffer extends string | AccountMeta<string> = string,
-  TAccountPermDelegationRecord extends string | AccountMeta<string> = string,
-  TAccountPermDelegationMetadata extends string | AccountMeta<string> = string,
   TAccountValidator extends string | AccountMeta<string> = string,
-  TAccountPermissionProgram extends string | AccountMeta<string> =
-    "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TAccountOwnerProgram extends string | AccountMeta<string> =
@@ -91,24 +85,9 @@ export type StartGameInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountPermission extends string
-        ? WritableAccount<TAccountPermission>
-        : TAccountPermission,
-      TAccountPermDelegationBuffer extends string
-        ? WritableAccount<TAccountPermDelegationBuffer>
-        : TAccountPermDelegationBuffer,
-      TAccountPermDelegationRecord extends string
-        ? WritableAccount<TAccountPermDelegationRecord>
-        : TAccountPermDelegationRecord,
-      TAccountPermDelegationMetadata extends string
-        ? WritableAccount<TAccountPermDelegationMetadata>
-        : TAccountPermDelegationMetadata,
       TAccountValidator extends string
         ? ReadonlyAccount<TAccountValidator>
         : TAccountValidator,
-      TAccountPermissionProgram extends string
-        ? ReadonlyAccount<TAccountPermissionProgram>
-        : TAccountPermissionProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -162,12 +141,7 @@ export type StartGameAsyncInput<
   TAccountDelegationRecordGame extends string = string,
   TAccountDelegationMetadataGame extends string = string,
   TAccountGame extends string = string,
-  TAccountPermission extends string = string,
-  TAccountPermDelegationBuffer extends string = string,
-  TAccountPermDelegationRecord extends string = string,
-  TAccountPermDelegationMetadata extends string = string,
   TAccountValidator extends string = string,
-  TAccountPermissionProgram extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountOwnerProgram extends string = string,
   TAccountDelegationProgram extends string = string,
@@ -177,12 +151,7 @@ export type StartGameAsyncInput<
   delegationRecordGame?: Address<TAccountDelegationRecordGame>;
   delegationMetadataGame?: Address<TAccountDelegationMetadataGame>;
   game?: Address<TAccountGame>;
-  permission: Address<TAccountPermission>;
-  permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
-  permDelegationRecord: Address<TAccountPermDelegationRecord>;
-  permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
   validator: Address<TAccountValidator>;
-  permissionProgram?: Address<TAccountPermissionProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   ownerProgram?: Address<TAccountOwnerProgram>;
   delegationProgram?: Address<TAccountDelegationProgram>;
@@ -195,12 +164,7 @@ export async function getStartGameInstructionAsync<
   TAccountDelegationRecordGame extends string,
   TAccountDelegationMetadataGame extends string,
   TAccountGame extends string,
-  TAccountPermission extends string,
-  TAccountPermDelegationBuffer extends string,
-  TAccountPermDelegationRecord extends string,
-  TAccountPermDelegationMetadata extends string,
   TAccountValidator extends string,
-  TAccountPermissionProgram extends string,
   TAccountSystemProgram extends string,
   TAccountOwnerProgram extends string,
   TAccountDelegationProgram extends string,
@@ -212,12 +176,7 @@ export async function getStartGameInstructionAsync<
     TAccountDelegationRecordGame,
     TAccountDelegationMetadataGame,
     TAccountGame,
-    TAccountPermission,
-    TAccountPermDelegationBuffer,
-    TAccountPermDelegationRecord,
-    TAccountPermDelegationMetadata,
     TAccountValidator,
-    TAccountPermissionProgram,
     TAccountSystemProgram,
     TAccountOwnerProgram,
     TAccountDelegationProgram
@@ -231,12 +190,7 @@ export async function getStartGameInstructionAsync<
     TAccountDelegationRecordGame,
     TAccountDelegationMetadataGame,
     TAccountGame,
-    TAccountPermission,
-    TAccountPermDelegationBuffer,
-    TAccountPermDelegationRecord,
-    TAccountPermDelegationMetadata,
     TAccountValidator,
-    TAccountPermissionProgram,
     TAccountSystemProgram,
     TAccountOwnerProgram,
     TAccountDelegationProgram
@@ -259,24 +213,7 @@ export async function getStartGameInstructionAsync<
       isWritable: true,
     },
     game: { value: input.game ?? null, isWritable: true },
-    permission: { value: input.permission ?? null, isWritable: true },
-    permDelegationBuffer: {
-      value: input.permDelegationBuffer ?? null,
-      isWritable: true,
-    },
-    permDelegationRecord: {
-      value: input.permDelegationRecord ?? null,
-      isWritable: true,
-    },
-    permDelegationMetadata: {
-      value: input.permDelegationMetadata ?? null,
-      isWritable: true,
-    },
     validator: { value: input.validator ?? null, isWritable: false },
-    permissionProgram: {
-      value: input.permissionProgram ?? null,
-      isWritable: false,
-    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
     delegationProgram: {
@@ -339,10 +276,6 @@ export async function getStartGameInstructionAsync<
       ],
     });
   }
-  if (!accounts.permissionProgram.value) {
-    accounts.permissionProgram.value =
-      "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1" as Address<"ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1">;
-  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -364,12 +297,7 @@ export async function getStartGameInstructionAsync<
       getAccountMeta(accounts.delegationRecordGame),
       getAccountMeta(accounts.delegationMetadataGame),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.permission),
-      getAccountMeta(accounts.permDelegationBuffer),
-      getAccountMeta(accounts.permDelegationRecord),
-      getAccountMeta(accounts.permDelegationMetadata),
       getAccountMeta(accounts.validator),
-      getAccountMeta(accounts.permissionProgram),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.ownerProgram),
       getAccountMeta(accounts.delegationProgram),
@@ -385,12 +313,7 @@ export async function getStartGameInstructionAsync<
     TAccountDelegationRecordGame,
     TAccountDelegationMetadataGame,
     TAccountGame,
-    TAccountPermission,
-    TAccountPermDelegationBuffer,
-    TAccountPermDelegationRecord,
-    TAccountPermDelegationMetadata,
     TAccountValidator,
-    TAccountPermissionProgram,
     TAccountSystemProgram,
     TAccountOwnerProgram,
     TAccountDelegationProgram
@@ -403,12 +326,7 @@ export type StartGameInput<
   TAccountDelegationRecordGame extends string = string,
   TAccountDelegationMetadataGame extends string = string,
   TAccountGame extends string = string,
-  TAccountPermission extends string = string,
-  TAccountPermDelegationBuffer extends string = string,
-  TAccountPermDelegationRecord extends string = string,
-  TAccountPermDelegationMetadata extends string = string,
   TAccountValidator extends string = string,
-  TAccountPermissionProgram extends string = string,
   TAccountSystemProgram extends string = string,
   TAccountOwnerProgram extends string = string,
   TAccountDelegationProgram extends string = string,
@@ -418,12 +336,7 @@ export type StartGameInput<
   delegationRecordGame: Address<TAccountDelegationRecordGame>;
   delegationMetadataGame: Address<TAccountDelegationMetadataGame>;
   game: Address<TAccountGame>;
-  permission: Address<TAccountPermission>;
-  permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
-  permDelegationRecord: Address<TAccountPermDelegationRecord>;
-  permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
   validator: Address<TAccountValidator>;
-  permissionProgram?: Address<TAccountPermissionProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   ownerProgram?: Address<TAccountOwnerProgram>;
   delegationProgram?: Address<TAccountDelegationProgram>;
@@ -436,12 +349,7 @@ export function getStartGameInstruction<
   TAccountDelegationRecordGame extends string,
   TAccountDelegationMetadataGame extends string,
   TAccountGame extends string,
-  TAccountPermission extends string,
-  TAccountPermDelegationBuffer extends string,
-  TAccountPermDelegationRecord extends string,
-  TAccountPermDelegationMetadata extends string,
   TAccountValidator extends string,
-  TAccountPermissionProgram extends string,
   TAccountSystemProgram extends string,
   TAccountOwnerProgram extends string,
   TAccountDelegationProgram extends string,
@@ -453,12 +361,7 @@ export function getStartGameInstruction<
     TAccountDelegationRecordGame,
     TAccountDelegationMetadataGame,
     TAccountGame,
-    TAccountPermission,
-    TAccountPermDelegationBuffer,
-    TAccountPermDelegationRecord,
-    TAccountPermDelegationMetadata,
     TAccountValidator,
-    TAccountPermissionProgram,
     TAccountSystemProgram,
     TAccountOwnerProgram,
     TAccountDelegationProgram
@@ -471,12 +374,7 @@ export function getStartGameInstruction<
   TAccountDelegationRecordGame,
   TAccountDelegationMetadataGame,
   TAccountGame,
-  TAccountPermission,
-  TAccountPermDelegationBuffer,
-  TAccountPermDelegationRecord,
-  TAccountPermDelegationMetadata,
   TAccountValidator,
-  TAccountPermissionProgram,
   TAccountSystemProgram,
   TAccountOwnerProgram,
   TAccountDelegationProgram
@@ -498,24 +396,7 @@ export function getStartGameInstruction<
       isWritable: true,
     },
     game: { value: input.game ?? null, isWritable: true },
-    permission: { value: input.permission ?? null, isWritable: true },
-    permDelegationBuffer: {
-      value: input.permDelegationBuffer ?? null,
-      isWritable: true,
-    },
-    permDelegationRecord: {
-      value: input.permDelegationRecord ?? null,
-      isWritable: true,
-    },
-    permDelegationMetadata: {
-      value: input.permDelegationMetadata ?? null,
-      isWritable: true,
-    },
     validator: { value: input.validator ?? null, isWritable: false },
-    permissionProgram: {
-      value: input.permissionProgram ?? null,
-      isWritable: false,
-    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
     ownerProgram: { value: input.ownerProgram ?? null, isWritable: false },
     delegationProgram: {
@@ -532,10 +413,6 @@ export function getStartGameInstruction<
   const args = { ...input };
 
   // Resolve default values.
-  if (!accounts.permissionProgram.value) {
-    accounts.permissionProgram.value =
-      "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1" as Address<"ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1">;
-  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -557,12 +434,7 @@ export function getStartGameInstruction<
       getAccountMeta(accounts.delegationRecordGame),
       getAccountMeta(accounts.delegationMetadataGame),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.permission),
-      getAccountMeta(accounts.permDelegationBuffer),
-      getAccountMeta(accounts.permDelegationRecord),
-      getAccountMeta(accounts.permDelegationMetadata),
       getAccountMeta(accounts.validator),
-      getAccountMeta(accounts.permissionProgram),
       getAccountMeta(accounts.systemProgram),
       getAccountMeta(accounts.ownerProgram),
       getAccountMeta(accounts.delegationProgram),
@@ -578,12 +450,7 @@ export function getStartGameInstruction<
     TAccountDelegationRecordGame,
     TAccountDelegationMetadataGame,
     TAccountGame,
-    TAccountPermission,
-    TAccountPermDelegationBuffer,
-    TAccountPermDelegationRecord,
-    TAccountPermDelegationMetadata,
     TAccountValidator,
-    TAccountPermissionProgram,
     TAccountSystemProgram,
     TAccountOwnerProgram,
     TAccountDelegationProgram
@@ -601,15 +468,10 @@ export type ParsedStartGameInstruction<
     delegationRecordGame: TAccountMetas[2];
     delegationMetadataGame: TAccountMetas[3];
     game: TAccountMetas[4];
-    permission: TAccountMetas[5];
-    permDelegationBuffer: TAccountMetas[6];
-    permDelegationRecord: TAccountMetas[7];
-    permDelegationMetadata: TAccountMetas[8];
-    validator: TAccountMetas[9];
-    permissionProgram: TAccountMetas[10];
-    systemProgram: TAccountMetas[11];
-    ownerProgram: TAccountMetas[12];
-    delegationProgram: TAccountMetas[13];
+    validator: TAccountMetas[5];
+    systemProgram: TAccountMetas[6];
+    ownerProgram: TAccountMetas[7];
+    delegationProgram: TAccountMetas[8];
   };
   data: StartGameInstructionData;
 };
@@ -622,7 +484,7 @@ export function parseStartGameInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedStartGameInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 14) {
+  if (instruction.accounts.length < 9) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -640,12 +502,7 @@ export function parseStartGameInstruction<
       delegationRecordGame: getNextAccount(),
       delegationMetadataGame: getNextAccount(),
       game: getNextAccount(),
-      permission: getNextAccount(),
-      permDelegationBuffer: getNextAccount(),
-      permDelegationRecord: getNextAccount(),
-      permDelegationMetadata: getNextAccount(),
       validator: getNextAccount(),
-      permissionProgram: getNextAccount(),
       systemProgram: getNextAccount(),
       ownerProgram: getNextAccount(),
       delegationProgram: getNextAccount(),

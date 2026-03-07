@@ -69,7 +69,6 @@ export type GameState = {
   dealerIndex: number;
   currentPlayer: number;
   lastRaiser: number;
-  /** Ordered deck after VRF shuffle — community cards live at indices 12-16. */
   deck: ReadonlyUint8Array;
   players: Array<Address>;
   playerStatus: ReadonlyUint8Array;
@@ -94,7 +93,6 @@ export type GameStateArgs = {
   dealerIndex: number;
   currentPlayer: number;
   lastRaiser: number;
-  /** Ordered deck after VRF shuffle — community cards live at indices 12-16. */
   deck: ReadonlyUint8Array;
   players: Array<Address>;
   playerStatus: ReadonlyUint8Array;

@@ -52,12 +52,14 @@ export type CreateGameInstruction<
   TProgram extends string = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
   TAccountAuthority extends string | AccountMeta<string> = string,
   TAccountGame extends string | AccountMeta<string> = string,
-  TAccountHand0 extends string | AccountMeta<string> = string,
-  TAccountHand1 extends string | AccountMeta<string> = string,
-  TAccountHand2 extends string | AccountMeta<string> = string,
-  TAccountHand3 extends string | AccountMeta<string> = string,
-  TAccountHand4 extends string | AccountMeta<string> = string,
-  TAccountHand5 extends string | AccountMeta<string> = string,
+  TAccountPermission extends string | AccountMeta<string> = string,
+  TAccountPermDelegationBuffer extends string | AccountMeta<string> = string,
+  TAccountPermDelegationRecord extends string | AccountMeta<string> = string,
+  TAccountPermDelegationMetadata extends string | AccountMeta<string> = string,
+  TAccountValidator extends string | AccountMeta<string> = string,
+  TAccountPermissionProgram extends string | AccountMeta<string> =
+    "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1",
+  TAccountDelegationProgram extends string | AccountMeta<string> = string,
   TAccountSystemProgram extends string | AccountMeta<string> =
     "11111111111111111111111111111111",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -72,24 +74,27 @@ export type CreateGameInstruction<
       TAccountGame extends string
         ? WritableAccount<TAccountGame>
         : TAccountGame,
-      TAccountHand0 extends string
-        ? WritableAccount<TAccountHand0>
-        : TAccountHand0,
-      TAccountHand1 extends string
-        ? WritableAccount<TAccountHand1>
-        : TAccountHand1,
-      TAccountHand2 extends string
-        ? WritableAccount<TAccountHand2>
-        : TAccountHand2,
-      TAccountHand3 extends string
-        ? WritableAccount<TAccountHand3>
-        : TAccountHand3,
-      TAccountHand4 extends string
-        ? WritableAccount<TAccountHand4>
-        : TAccountHand4,
-      TAccountHand5 extends string
-        ? WritableAccount<TAccountHand5>
-        : TAccountHand5,
+      TAccountPermission extends string
+        ? WritableAccount<TAccountPermission>
+        : TAccountPermission,
+      TAccountPermDelegationBuffer extends string
+        ? WritableAccount<TAccountPermDelegationBuffer>
+        : TAccountPermDelegationBuffer,
+      TAccountPermDelegationRecord extends string
+        ? WritableAccount<TAccountPermDelegationRecord>
+        : TAccountPermDelegationRecord,
+      TAccountPermDelegationMetadata extends string
+        ? WritableAccount<TAccountPermDelegationMetadata>
+        : TAccountPermDelegationMetadata,
+      TAccountValidator extends string
+        ? ReadonlyAccount<TAccountValidator>
+        : TAccountValidator,
+      TAccountPermissionProgram extends string
+        ? ReadonlyAccount<TAccountPermissionProgram>
+        : TAccountPermissionProgram,
+      TAccountDelegationProgram extends string
+        ? ReadonlyAccount<TAccountDelegationProgram>
+        : TAccountDelegationProgram,
       TAccountSystemProgram extends string
         ? ReadonlyAccount<TAccountSystemProgram>
         : TAccountSystemProgram,
@@ -144,22 +149,24 @@ export function getCreateGameInstructionDataCodec(): FixedSizeCodec<
 export type CreateGameAsyncInput<
   TAccountAuthority extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
+  TAccountPermission extends string = string,
+  TAccountPermDelegationBuffer extends string = string,
+  TAccountPermDelegationRecord extends string = string,
+  TAccountPermDelegationMetadata extends string = string,
+  TAccountValidator extends string = string,
+  TAccountPermissionProgram extends string = string,
+  TAccountDelegationProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
   game?: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
+  permission: Address<TAccountPermission>;
+  permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
+  permDelegationRecord: Address<TAccountPermDelegationRecord>;
+  permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
+  validator: Address<TAccountValidator>;
+  permissionProgram?: Address<TAccountPermissionProgram>;
+  delegationProgram: Address<TAccountDelegationProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameInstructionDataArgs["gameId"];
   tableId: CreateGameInstructionDataArgs["tableId"];
@@ -169,24 +176,26 @@ export type CreateGameAsyncInput<
 export async function getCreateGameInstructionAsync<
   TAccountAuthority extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
+  TAccountPermission extends string,
+  TAccountPermDelegationBuffer extends string,
+  TAccountPermDelegationRecord extends string,
+  TAccountPermDelegationMetadata extends string,
+  TAccountValidator extends string,
+  TAccountPermissionProgram extends string,
+  TAccountDelegationProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: CreateGameAsyncInput<
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
+    TAccountPermission,
+    TAccountPermDelegationBuffer,
+    TAccountPermDelegationRecord,
+    TAccountPermDelegationMetadata,
+    TAccountValidator,
+    TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -195,12 +204,13 @@ export async function getCreateGameInstructionAsync<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
+    TAccountPermission,
+    TAccountPermDelegationBuffer,
+    TAccountPermDelegationRecord,
+    TAccountPermDelegationMetadata,
+    TAccountValidator,
+    TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram
   >
 > {
@@ -212,12 +222,28 @@ export async function getCreateGameInstructionAsync<
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
+    permission: { value: input.permission ?? null, isWritable: true },
+    permDelegationBuffer: {
+      value: input.permDelegationBuffer ?? null,
+      isWritable: true,
+    },
+    permDelegationRecord: {
+      value: input.permDelegationRecord ?? null,
+      isWritable: true,
+    },
+    permDelegationMetadata: {
+      value: input.permDelegationMetadata ?? null,
+      isWritable: true,
+    },
+    validator: { value: input.validator ?? null, isWritable: false },
+    permissionProgram: {
+      value: input.permissionProgram ?? null,
+      isWritable: false,
+    },
+    delegationProgram: {
+      value: input.delegationProgram ?? null,
+      isWritable: false,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -240,6 +266,10 @@ export async function getCreateGameInstructionAsync<
       ],
     });
   }
+  if (!accounts.permissionProgram.value) {
+    accounts.permissionProgram.value =
+      "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1" as Address<"ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -250,12 +280,13 @@ export async function getCreateGameInstructionAsync<
     accounts: [
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
+      getAccountMeta(accounts.permission),
+      getAccountMeta(accounts.permDelegationBuffer),
+      getAccountMeta(accounts.permDelegationRecord),
+      getAccountMeta(accounts.permDelegationMetadata),
+      getAccountMeta(accounts.validator),
+      getAccountMeta(accounts.permissionProgram),
+      getAccountMeta(accounts.delegationProgram),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameInstructionDataEncoder().encode(
@@ -266,12 +297,13 @@ export async function getCreateGameInstructionAsync<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
+    TAccountPermission,
+    TAccountPermDelegationBuffer,
+    TAccountPermDelegationRecord,
+    TAccountPermDelegationMetadata,
+    TAccountValidator,
+    TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram
   >);
 }
@@ -279,22 +311,24 @@ export async function getCreateGameInstructionAsync<
 export type CreateGameInput<
   TAccountAuthority extends string = string,
   TAccountGame extends string = string,
-  TAccountHand0 extends string = string,
-  TAccountHand1 extends string = string,
-  TAccountHand2 extends string = string,
-  TAccountHand3 extends string = string,
-  TAccountHand4 extends string = string,
-  TAccountHand5 extends string = string,
+  TAccountPermission extends string = string,
+  TAccountPermDelegationBuffer extends string = string,
+  TAccountPermDelegationRecord extends string = string,
+  TAccountPermDelegationMetadata extends string = string,
+  TAccountValidator extends string = string,
+  TAccountPermissionProgram extends string = string,
+  TAccountDelegationProgram extends string = string,
   TAccountSystemProgram extends string = string,
 > = {
   authority: TransactionSigner<TAccountAuthority>;
   game: Address<TAccountGame>;
-  hand0: Address<TAccountHand0>;
-  hand1: Address<TAccountHand1>;
-  hand2: Address<TAccountHand2>;
-  hand3: Address<TAccountHand3>;
-  hand4: Address<TAccountHand4>;
-  hand5: Address<TAccountHand5>;
+  permission: Address<TAccountPermission>;
+  permDelegationBuffer: Address<TAccountPermDelegationBuffer>;
+  permDelegationRecord: Address<TAccountPermDelegationRecord>;
+  permDelegationMetadata: Address<TAccountPermDelegationMetadata>;
+  validator: Address<TAccountValidator>;
+  permissionProgram?: Address<TAccountPermissionProgram>;
+  delegationProgram: Address<TAccountDelegationProgram>;
   systemProgram?: Address<TAccountSystemProgram>;
   gameId: CreateGameInstructionDataArgs["gameId"];
   tableId: CreateGameInstructionDataArgs["tableId"];
@@ -304,24 +338,26 @@ export type CreateGameInput<
 export function getCreateGameInstruction<
   TAccountAuthority extends string,
   TAccountGame extends string,
-  TAccountHand0 extends string,
-  TAccountHand1 extends string,
-  TAccountHand2 extends string,
-  TAccountHand3 extends string,
-  TAccountHand4 extends string,
-  TAccountHand5 extends string,
+  TAccountPermission extends string,
+  TAccountPermDelegationBuffer extends string,
+  TAccountPermDelegationRecord extends string,
+  TAccountPermDelegationMetadata extends string,
+  TAccountValidator extends string,
+  TAccountPermissionProgram extends string,
+  TAccountDelegationProgram extends string,
   TAccountSystemProgram extends string,
   TProgramAddress extends Address = typeof AGENT_POKER_GAME_PROGRAM_ADDRESS,
 >(
   input: CreateGameInput<
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
+    TAccountPermission,
+    TAccountPermDelegationBuffer,
+    TAccountPermDelegationRecord,
+    TAccountPermDelegationMetadata,
+    TAccountValidator,
+    TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -329,12 +365,13 @@ export function getCreateGameInstruction<
   TProgramAddress,
   TAccountAuthority,
   TAccountGame,
-  TAccountHand0,
-  TAccountHand1,
-  TAccountHand2,
-  TAccountHand3,
-  TAccountHand4,
-  TAccountHand5,
+  TAccountPermission,
+  TAccountPermDelegationBuffer,
+  TAccountPermDelegationRecord,
+  TAccountPermDelegationMetadata,
+  TAccountValidator,
+  TAccountPermissionProgram,
+  TAccountDelegationProgram,
   TAccountSystemProgram
 > {
   // Program address.
@@ -345,12 +382,28 @@ export function getCreateGameInstruction<
   const originalAccounts = {
     authority: { value: input.authority ?? null, isWritable: true },
     game: { value: input.game ?? null, isWritable: true },
-    hand0: { value: input.hand0 ?? null, isWritable: true },
-    hand1: { value: input.hand1 ?? null, isWritable: true },
-    hand2: { value: input.hand2 ?? null, isWritable: true },
-    hand3: { value: input.hand3 ?? null, isWritable: true },
-    hand4: { value: input.hand4 ?? null, isWritable: true },
-    hand5: { value: input.hand5 ?? null, isWritable: true },
+    permission: { value: input.permission ?? null, isWritable: true },
+    permDelegationBuffer: {
+      value: input.permDelegationBuffer ?? null,
+      isWritable: true,
+    },
+    permDelegationRecord: {
+      value: input.permDelegationRecord ?? null,
+      isWritable: true,
+    },
+    permDelegationMetadata: {
+      value: input.permDelegationMetadata ?? null,
+      isWritable: true,
+    },
+    validator: { value: input.validator ?? null, isWritable: false },
+    permissionProgram: {
+      value: input.permissionProgram ?? null,
+      isWritable: false,
+    },
+    delegationProgram: {
+      value: input.delegationProgram ?? null,
+      isWritable: false,
+    },
     systemProgram: { value: input.systemProgram ?? null, isWritable: false },
   };
   const accounts = originalAccounts as Record<
@@ -362,6 +415,10 @@ export function getCreateGameInstruction<
   const args = { ...input };
 
   // Resolve default values.
+  if (!accounts.permissionProgram.value) {
+    accounts.permissionProgram.value =
+      "ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1" as Address<"ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1">;
+  }
   if (!accounts.systemProgram.value) {
     accounts.systemProgram.value =
       "11111111111111111111111111111111" as Address<"11111111111111111111111111111111">;
@@ -372,12 +429,13 @@ export function getCreateGameInstruction<
     accounts: [
       getAccountMeta(accounts.authority),
       getAccountMeta(accounts.game),
-      getAccountMeta(accounts.hand0),
-      getAccountMeta(accounts.hand1),
-      getAccountMeta(accounts.hand2),
-      getAccountMeta(accounts.hand3),
-      getAccountMeta(accounts.hand4),
-      getAccountMeta(accounts.hand5),
+      getAccountMeta(accounts.permission),
+      getAccountMeta(accounts.permDelegationBuffer),
+      getAccountMeta(accounts.permDelegationRecord),
+      getAccountMeta(accounts.permDelegationMetadata),
+      getAccountMeta(accounts.validator),
+      getAccountMeta(accounts.permissionProgram),
+      getAccountMeta(accounts.delegationProgram),
       getAccountMeta(accounts.systemProgram),
     ],
     data: getCreateGameInstructionDataEncoder().encode(
@@ -388,12 +446,13 @@ export function getCreateGameInstruction<
     TProgramAddress,
     TAccountAuthority,
     TAccountGame,
-    TAccountHand0,
-    TAccountHand1,
-    TAccountHand2,
-    TAccountHand3,
-    TAccountHand4,
-    TAccountHand5,
+    TAccountPermission,
+    TAccountPermDelegationBuffer,
+    TAccountPermDelegationRecord,
+    TAccountPermDelegationMetadata,
+    TAccountValidator,
+    TAccountPermissionProgram,
+    TAccountDelegationProgram,
     TAccountSystemProgram
   >);
 }
@@ -406,13 +465,14 @@ export type ParsedCreateGameInstruction<
   accounts: {
     authority: TAccountMetas[0];
     game: TAccountMetas[1];
-    hand0: TAccountMetas[2];
-    hand1: TAccountMetas[3];
-    hand2: TAccountMetas[4];
-    hand3: TAccountMetas[5];
-    hand4: TAccountMetas[6];
-    hand5: TAccountMetas[7];
-    systemProgram: TAccountMetas[8];
+    permission: TAccountMetas[2];
+    permDelegationBuffer: TAccountMetas[3];
+    permDelegationRecord: TAccountMetas[4];
+    permDelegationMetadata: TAccountMetas[5];
+    validator: TAccountMetas[6];
+    permissionProgram: TAccountMetas[7];
+    delegationProgram: TAccountMetas[8];
+    systemProgram: TAccountMetas[9];
   };
   data: CreateGameInstructionData;
 };
@@ -425,7 +485,7 @@ export function parseCreateGameInstruction<
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
 ): ParsedCreateGameInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 9) {
+  if (instruction.accounts.length < 10) {
     // TODO: Coded error.
     throw new Error("Not enough accounts");
   }
@@ -440,12 +500,13 @@ export function parseCreateGameInstruction<
     accounts: {
       authority: getNextAccount(),
       game: getNextAccount(),
-      hand0: getNextAccount(),
-      hand1: getNextAccount(),
-      hand2: getNextAccount(),
-      hand3: getNextAccount(),
-      hand4: getNextAccount(),
-      hand5: getNextAccount(),
+      permission: getNextAccount(),
+      permDelegationBuffer: getNextAccount(),
+      permDelegationRecord: getNextAccount(),
+      permDelegationMetadata: getNextAccount(),
+      validator: getNextAccount(),
+      permissionProgram: getNextAccount(),
+      delegationProgram: getNextAccount(),
       systemProgram: getNextAccount(),
     },
     data: getCreateGameInstructionDataDecoder().decode(instruction.data),
